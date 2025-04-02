@@ -40,7 +40,7 @@ import java.util.Locale
  */
 @Composable
 fun ReceiptsScreen(
-    onReceiptClick: (receiptId: Int) -> Unit,
+    onReceiptClick: (receiptId: Long) -> Unit,
     onAddClick: () -> Unit,
     onScanClick: () -> Unit,
     viewModel: ReceiptsViewModel = hiltViewModel(),

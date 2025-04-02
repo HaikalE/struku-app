@@ -3,6 +3,8 @@ package com.example.struku.domain.usecase
 import com.example.struku.domain.model.Budget
 import com.example.struku.domain.repository.BudgetRepository
 import com.example.struku.domain.repository.ReceiptRepository
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import java.util.Calendar
 import java.util.Date
 import javax.inject.Inject
@@ -28,7 +30,7 @@ class GetMonthlyReportUseCase @Inject constructor(
         val totalByCategory = receiptRepository.getTotalByCategory(startDate, endDate)
         
         // Dapatkan anggaran untuk bulan dan tahun yang ditentukan
-        val budgets = budgetRepository.getBudgetsByMonthYear(month, year).firstOrNull() ?: emptyList()
+        val budgets = budgetRepository.getBudgetsByMonthYear(month, year).first()
         
         // Buat laporan untuk setiap kategori
         return totalByCategory.mapValues { (category, total) ->

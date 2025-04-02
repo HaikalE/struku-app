@@ -34,7 +34,7 @@ class ScanReceiptUseCase @Inject constructor(
         // Simpan gambar jika berhasil menyimpan receipt
         if (receiptId > 0) {
             val imageUri = ocrRepository.saveReceiptImage(image, receiptId)
-            val updatedReceipt = receipt.copy(id = receiptId.toInt(), imageUri = imageUri)
+            val updatedReceipt = receipt.copy(id = receiptId, imageUri = imageUri)
             receiptRepository.updateReceipt(updatedReceipt)
         }
         

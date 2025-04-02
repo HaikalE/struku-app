@@ -164,7 +164,8 @@ class ReceiptReviewViewModel @Inject constructor(
                 receiptRepository.updateReceipt(receipt)
                 _state.update { it.copy(
                     isLoading = false,
-                    saveCompleted = true
+                    saveCompleted = true,
+                    saveMessage = "Struk berhasil disimpan"
                 ) }
             } catch (e: Exception) {
                 _state.update { it.copy(
@@ -181,5 +182,6 @@ data class ReceiptReviewState(
     val receipt: Receipt? = null,
     val availableCategories: List<Category> = emptyList(),
     val error: String? = null,
-    val saveCompleted: Boolean = false
+    val saveCompleted: Boolean = false,
+    val saveMessage: String? = null
 )

@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material3.CircularProgressIndicator
@@ -57,6 +56,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.struku.R
+import com.example.struku.presentation.NavRoutes
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -80,7 +80,7 @@ fun ScannerScreen(
     LaunchedEffect(state.scannedReceiptId) {
         state.scannedReceiptId?.let { receiptId ->
             // Navigate to receipt detail/review screen
-            navController.navigate("receipt_review/$receiptId")
+            navController.navigate(NavRoutes.receiptReview(receiptId))
             viewModel.resetScannedReceiptId() // Reset after navigation
         }
     }
@@ -183,8 +183,10 @@ fun ScannerScreen(
                     }
                 }
                 state.error != null -> {
+                    // Use safe unwrapping for the error message
+                    val errorText = state.error ?: "Unknown error occurred"
                     Text(
-                        text = state.error,
+                        text = errorText,
                         color = Color.Red,
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,

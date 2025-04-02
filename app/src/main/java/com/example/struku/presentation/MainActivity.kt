@@ -1,11 +1,12 @@
 package com.example.struku.presentation
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -36,16 +37,23 @@ class MainActivity : FragmentActivity() {
                     // Collect the auth state
                     val authState by authManager.authState.collectAsState()
                     
+                    // Log the current auth state for debugging
+                    LaunchedEffect(authState) {
+                        Log.d("MainActivity", "Current auth state: $authState")
+                    }
+                    
                     // Show appropriate screen based on auth state
                     when (authState) {
                         AuthState.LOCKED -> {
                             AuthenticationScreen(
                                 onAuthenticate = {
+                                    // This will trigger biometric prompt
                                     authManager.authenticate(this)
                                 }
                             )
                         }
                         AuthState.UNLOCKED -> {
+                            // This will render the main app with navigation
                             AuthenticatedApp()
                         }
                     }

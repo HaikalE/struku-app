@@ -214,8 +214,8 @@ fun AddReceiptScreen(
         qty * price 
     }
     
-    // Function to save receipt
-    val saveReceipt = {
+    // Function to save receipt with explicit Unit return type
+    val saveReceipt: () -> Unit = {
         if (merchantName.isBlank()) {
             errorMessage = "Nama merchant harus diisi"
             return@saveReceipt

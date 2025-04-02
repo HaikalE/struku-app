@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Struku</string>
+    
+    <!-- Common actions -->
+    <string name="action_scan">Pindai</string>
+    <string name="action_save">Simpan</string>
+    <string name="action_cancel">Batal</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Hapus</string>
+    
+    <!-- Main screens -->
+    <string name="screen_receipts">Struk</string>
+    <string name="screen_analytics">Analitik</string>
+    <string name="screen_settings">Pengaturan</string>
+    
+    <!-- Scan screen -->
+    <string name="scan_instructions">Posisikan struk di dalam bingkai</string>
+    <string name="scan_processing">Memproses...</string>
+    <string name="scan_success">Struk berhasil dipindai</string>
+    <string name="scan_error">Gagal memindai struk</string>
+    
+    <!-- Receipt details -->
+    <string name="receipt_merchant">Pedagang</string>
+    <string name="receipt_date">Tanggal</string>
+    <string name="receipt_items">Item</string>
+    <string name="receipt_total">Total</string>
+    <string name="receipt_category">Kategori</string>
+    
+    <!-- Categories -->
+    <string name="category_groceries">Bahan Makanan</string>
+    <string name="category_dining">Makan di Luar</string>
+    <string name="category_transport">Transportasi</string>
+    <string name="category_shopping">Belanja</string>
+    <string name="category_utilities">Tagihan</string>
+    <string name="category_health">Kesehatan</string>
+    <string name="category_entertainment">Hiburan</string>
+    <string name="category_other">Lainnya</string>
+    
+    <!-- Analytics -->
+    <string name="analytics_monthly_spending">Pengeluaran Bulanan</string>
+    <string name="analytics_category_breakdown">Breakdown Kategori</string>
+    <string name="analytics_spending_trend">Tren Pengeluaran</string>
+    <string name="analytics_budget_status">Status Anggaran</string>
+    
+    <!-- Settings -->
+    <string name="settings_security">Keamanan</string>
+    <string name="settings_biometric">Gunakan autentikasi biometrik</string>
+    <string name="settings_backup">Cadangkan data</string>
+    <string name="settings_restore">Pulihkan data</string>
+    <string name="settings_currency">Mata uang default</string>
+    <string name="settings_language">Bahasa</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_about">Tentang aplikasi</string>
+</resources>

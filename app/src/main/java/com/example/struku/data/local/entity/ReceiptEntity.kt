@@ -7,7 +7,7 @@ import java.util.Date
 @Entity(tableName = "receipts")
 data class ReceiptEntity(
     @PrimaryKey(autoGenerate = true)
-    val id: Int = 0,
+    val id: Long = 0,
     val merchantName: String,
     val date: Date,
     val total: Double,

@@ -35,10 +35,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -144,13 +144,13 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
 }
 
 /**
- * Data class for receipt items
+ * Data class for receipt item state
  */
-data class ReceiptItem(
+data class ReceiptItemState(
     val id: Int,
-    var name: String,
-    var quantity: Int,
-    var price: Double
+    val name: String,
+    val quantity: String,
+    val price: String
 )
 
 /**
@@ -166,8 +166,8 @@ fun AddReceiptScreen(navController: NavController) {
     var totalAmount by remember { mutableStateOf("") }
     var isExpanded by remember { mutableStateOf(false) }
     
-    // List of receipt items
-    val items = remember { mutableStateListOf<ReceiptItem>() }
+    // List of receipt items - using a different approach for state management
+    var itemStates by remember { mutableStateOf(listOf<ReceiptItemState>()) }
     
     // Categories (in a real app, this would come from a repository)
     val categories = listOf("Makanan", "Transportasi", "Belanja", "Hiburan", "Pendidikan", "Lainnya")
@@ -189,9 +189,9 @@ fun AddReceiptScreen(navController: NavController) {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // Add a new empty item to the list
-                    val newId = if (items.isEmpty()) 1 else items.maxOf { it.id } + 1
-                    items.add(ReceiptItem(newId, "", 1, 0.0))
+                    // Add a new empty item to the list with a unique ID
+                    val newId = if (itemStates.isEmpty()) 1 else itemStates.maxOf { it.id } + 1
+                    itemStates = itemStates + ReceiptItemState(newId, "", "1", "")
                 }
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Tambah Item")
@@ -212,7 +212,8 @@ fun AddReceiptScreen(navController: NavController) {
                 label = { Text("Nama Merchant") },
                 leadingIcon = { Icon(Icons.Default.Store, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                placeholder = { Text("Contoh: Alfamart Jl. Sudirman") }
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -224,7 +225,8 @@ fun AddReceiptScreen(navController: NavController) {
                 label = { Text("Tanggal (YYYY-MM-DD)") },
                 leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                placeholder = { Text("Contoh: 2025-04-02") }
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -245,7 +247,8 @@ fun AddReceiptScreen(navController: NavController) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    placeholder = { Text("Pilih kategori...") }
                 )
                 
                 ExposedDropdownMenu(
@@ -275,14 +278,14 @@ fun AddReceiptScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(8.dp))
             
             // Display item list
-            if (items.isEmpty()) {
+            if (itemStates.isEmpty()) {
                 Text(
                     "Belum ada item. Klik tombol + untuk menambahkan item.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
             } else {
-                items.forEach { item ->
+                itemStates.forEachIndexed { index, item ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -293,10 +296,16 @@ fun AddReceiptScreen(navController: NavController) {
                         ) {
                             OutlinedTextField(
                                 value = item.name,
-                                onValueChange = { item.name = it },
+                                onValueChange = { newName ->
+                                    // Create a new list with the updated item
+                                    val newList = itemStates.toMutableList()
+                                    newList[index] = item.copy(name = newName)
+                                    itemStates = newList
+                                },
                                 label = { Text("Nama Item") },
                                 modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
+                                singleLine = true,
+                                placeholder = { Text("Contoh: Indomie Goreng") }
                             )
                             
                             Spacer(modifier = Modifier.height(8.dp))
@@ -305,31 +314,47 @@ fun AddReceiptScreen(navController: NavController) {
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 OutlinedTextField(
-                                    value = item.quantity.toString(),
-                                    onValueChange = { 
-                                        item.quantity = it.toIntOrNull() ?: 1
+                                    value = item.quantity,
+                                    onValueChange = { newQty ->
+                                        // Update with only valid numbers
+                                        if (newQty.isEmpty() || newQty.all { it.isDigit() }) {
+                                            val newList = itemStates.toMutableList()
+                                            newList[index] = item.copy(quantity = newQty)
+                                            itemStates = newList
+                                        }
                                     },
                                     label = { Text("Qty") },
                                     modifier = Modifier.weight(1f),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    singleLine = true
+                                    singleLine = true,
+                                    placeholder = { Text("1") }
                                 )
                                 
                                 Spacer(modifier = Modifier.width(8.dp))
                                 
                                 OutlinedTextField(
-                                    value = if (item.price == 0.0) "" else item.price.toString(),
-                                    onValueChange = { 
-                                        item.price = it.toDoubleOrNull() ?: 0.0
+                                    value = item.price,
+                                    onValueChange = { newPrice ->
+                                        // Allow empty string, digits and single decimal point
+                                        if (newPrice.isEmpty() || 
+                                            newPrice.all { it.isDigit() || it == '.' } && 
+                                            newPrice.count { it == '.' } <= 1) {
+                                            val newList = itemStates.toMutableList()
+                                            newList[index] = item.copy(price = newPrice)
+                                            itemStates = newList
+                                        }
                                     },
                                     label = { Text("Harga") },
                                     modifier = Modifier.weight(2f),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    singleLine = true
+                                    singleLine = true,
+                                    placeholder = { Text("Contoh: 3500") }
                                 )
                                 
                                 IconButton(
-                                    onClick = { items.remove(item) }
+                                    onClick = { 
+                                        itemStates = itemStates.filterIndexed { i, _ -> i != index }
+                                    }
                                 ) {
                                     Icon(
                                         Icons.Default.Delete,
@@ -348,21 +373,56 @@ fun AddReceiptScreen(navController: NavController) {
             // Total amount
             OutlinedTextField(
                 value = totalAmount,
-                onValueChange = { totalAmount = it },
+                onValueChange = { newTotal ->
+                    // Allow only valid numbers for the total
+                    if (newTotal.isEmpty() || 
+                        newTotal.all { it.isDigit() || it == '.' } && 
+                        newTotal.count { it == '.' } <= 1) {
+                        totalAmount = newTotal
+                    }
+                },
                 label = { Text("Total (Rp)") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true
+                singleLine = true,
+                placeholder = { Text("Contoh: 40000") }
             )
             
             Spacer(modifier = Modifier.height(24.dp))
             
             // Calculate total from items
-            val calculatedTotal = items.sumOf { it.price * it.quantity }
+            val calculatedTotal = itemStates.sumOf { 
+                val qty = it.quantity.toIntOrNull() ?: 0
+                val price = it.price.toDoubleOrNull() ?: 0.0
+                qty * price 
+            }
+            
             if (calculatedTotal > 0) {
                 Text(
                     "Total dari item: ${currencyFormatter.format(calculatedTotal)}",
                     style = MaterialTheme.typography.bodyMedium
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+            
+            // Contoh data - ditambahkan untuk membantu pengguna
+            if (itemStates.isEmpty()) {
+                Text(
+                    "Contoh:",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                
+                Text(
+                    "Merchant: Alfamart Jl. Sudirman\n" +
+                    "Tanggal: 2025-04-02\n" +
+                    "Kategori: Belanja\n\n" +
+                    "Item 1: Indomie Goreng, Qty: 5, Harga: 3500\n" +
+                    "Item 2: Aqua 600ml, Qty: 2, Harga: 4000\n" +
+                    "Item 3: Teh Pucuk Harum, Qty: 1, Harga: 5500\n" +
+                    "Item 4: Roti Tawar, Qty: 1, Harga: 12500\n\n" +
+                    "Total: 40000",
+                    style = MaterialTheme.typography.bodySmall
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))

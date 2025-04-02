@@ -1,5 +1,7 @@
 package com.example.struku.presentation
 
+import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,10 +21,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -31,9 +39,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,21 +51,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.struku.domain.model.LineItem
+import com.example.struku.domain.model.Receipt
+import com.example.struku.domain.repository.ReceiptRepository
 import com.example.struku.presentation.analytics.AnalyticsScreen
 import com.example.struku.presentation.receipts.ReceiptDetailScreen
 import com.example.struku.presentation.receipts.ReceiptsScreen
 import com.example.struku.presentation.scan.ScannerScreen
 import com.example.struku.presentation.settings.ExportScreen
 import com.example.struku.presentation.settings.SettingsScreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 /**
@@ -111,7 +134,10 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
     
     // Receipt add screen (previously missing)
     composable(NavRoutes.RECEIPT_ADD) {
-        AddReceiptScreen(navController)
+        AddReceiptScreen(
+            navController = navController,
+            receiptRepository = hiltViewModel<AddReceiptViewModel>().repository
+        )
     }
     
     // Receipt scan screen
@@ -158,13 +184,20 @@ data class ReceiptItemState(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddReceiptScreen(navController: NavController) {
+fun AddReceiptScreen(
+    navController: NavController,
+    receiptRepository: ReceiptRepository
+) {
     // State for form fields
     var merchantName by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("") }
-    var totalAmount by remember { mutableStateOf("") }
     var isExpanded by remember { mutableStateOf(false) }
+    
+    // Saving state
+    var isSaving by remember { mutableStateOf(false) }
+    var showSavedDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     
     // List of receipt items - using a different approach for state management
     var itemStates by remember { mutableStateOf(listOf<ReceiptItemState>()) }
@@ -174,6 +207,153 @@ fun AddReceiptScreen(navController: NavController) {
     
     // NumberFormat for currency
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+    
+    // Calculate total from items
+    val calculatedTotal = itemStates.sumOf { 
+        val qty = it.quantity.toIntOrNull() ?: 0
+        val price = it.price.toDoubleOrNull() ?: 0.0
+        qty * price 
+    }
+    
+    // Function to save receipt
+    val saveReceipt = {
+        if (merchantName.isBlank()) {
+            errorMessage = "Nama merchant harus diisi"
+            return@saveReceipt
+        }
+        
+        if (date.isBlank()) {
+            errorMessage = "Tanggal harus diisi"
+            return@saveReceipt
+        }
+        
+        if (selectedCategory.isBlank()) {
+            errorMessage = "Kategori harus dipilih"
+            return@saveReceipt
+        }
+        
+        if (itemStates.isEmpty()) {
+            errorMessage = "Tambahkan minimal satu item"
+            return@saveReceipt
+        }
+        
+        // Parse date
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val parsedDate = try {
+            dateFormat.parse(date) ?: Date()
+        } catch (e: Exception) {
+            errorMessage = "Format tanggal tidak valid (YYYY-MM-DD)"
+            return@saveReceipt
+        }
+        
+        // Convert items
+        val lineItems = itemStates.mapNotNull { state ->
+            val quantity = state.quantity.toIntOrNull() ?: return@mapNotNull null
+            val price = state.price.toDoubleOrNull() ?: return@mapNotNull null
+            
+            LineItem(
+                description = state.name,
+                quantity = quantity,
+                price = price
+            )
+        }
+        
+        if (lineItems.size != itemStates.size) {
+            errorMessage = "Semua item harus diisi dengan benar"
+            return@saveReceipt
+        }
+        
+        // Create receipt object
+        val receipt = Receipt(
+            merchantName = merchantName,
+            date = parsedDate,
+            category = selectedCategory,
+            total = calculatedTotal,
+            items = lineItems,
+            createdAt = Date(),
+            updatedAt = Date()
+        )
+        
+        // Save receipt
+        isSaving = true
+        errorMessage = null
+        
+        Log.d("AddReceiptScreen", "Saving receipt: $receipt")
+        
+        // Use coroutine to save receipt
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val receiptId = receiptRepository.saveReceipt(receipt)
+                Log.d("AddReceiptScreen", "Receipt saved with ID: $receiptId")
+                
+                withContext(Dispatchers.Main) {
+                    isSaving = false
+                    showSavedDialog = true
+                }
+            } catch (e: Exception) {
+                Log.e("AddReceiptScreen", "Error saving receipt", e)
+                withContext(Dispatchers.Main) {
+                    isSaving = false
+                    errorMessage = "Gagal menyimpan struk: ${e.message}"
+                }
+            }
+        }
+    }
+    
+    // Dialog konfirmasi sukses
+    if (showSavedDialog) {
+        Dialog(onDismissRequest = { /* Dialog tidak bisa ditutup dengan klik di luar */ }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "Struk Berhasil Disimpan!",
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "Struk Anda telah berhasil disimpan ke database. Anda dapat melihat daftar struk di halaman utama.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = {
+                            showSavedDialog = false
+                            navController.navigate(NavRoutes.RECEIPTS) {
+                                popUpTo(NavRoutes.RECEIPTS) {
+                                    inclusive = true
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Lihat Daftar Struk")
+                    }
+                }
+            }
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -198,249 +378,331 @@ fun AddReceiptScreen(navController: NavController) {
             }
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
+        Box(
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Merchant name field
-            OutlinedTextField(
-                value = merchantName,
-                onValueChange = { merchantName = it },
-                label = { Text("Nama Merchant") },
-                leadingIcon = { Icon(Icons.Default.Store, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text("Contoh: Alfamart Jl. Sudirman") }
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Date field
-            OutlinedTextField(
-                value = date,
-                onValueChange = { date = it },
-                label = { Text("Tanggal (YYYY-MM-DD)") },
-                leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text("Contoh: 2025-04-02") }
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Category dropdown
-            ExposedDropdownMenuBox(
-                expanded = isExpanded,
-                onExpandedChange = { isExpanded = it },
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
+                // Merchant name field
                 OutlinedTextField(
-                    value = selectedCategory,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Kategori") },
-                    leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                    placeholder = { Text("Pilih kategori...") }
+                    value = merchantName,
+                    onValueChange = { merchantName = it },
+                    label = { Text("Nama Merchant") },
+                    leadingIcon = { Icon(Icons.Default.Store, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Contoh: Alfamart Jl. Sudirman") }
                 )
                 
-                ExposedDropdownMenu(
-                    expanded = isExpanded,
-                    onDismissRequest = { isExpanded = false }
-                ) {
-                    categories.forEach { category ->
-                        DropdownMenuItem(
-                            text = { Text(category) },
-                            onClick = {
-                                selectedCategory = category
-                                isExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Items section
-            Text(
-                "Daftar Item",
-                style = MaterialTheme.typography.titleLarge
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Display item list
-            if (itemStates.isEmpty()) {
-                Text(
-                    "Belum ada item. Klik tombol + untuk menambahkan item.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(vertical = 16.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Date field
+                OutlinedTextField(
+                    value = date,
+                    onValueChange = { date = it },
+                    label = { Text("Tanggal (YYYY-MM-DD)") },
+                    leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Contoh: 2025-04-02") }
                 )
-            } else {
-                itemStates.forEachIndexed { index, item ->
-                    Card(
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Category dropdown
+                ExposedDropdownMenuBox(
+                    expanded = isExpanded,
+                    onExpandedChange = { isExpanded = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedCategory,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Kategori") },
+                        leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp)
+                            .menuAnchor(),
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                        placeholder = { Text("Pilih kategori...") }
+                    )
+                    
+                    ExposedDropdownMenu(
+                        expanded = isExpanded,
+                        onDismissRequest = { isExpanded = false }
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = item.name,
-                                onValueChange = { newName ->
-                                    // Create a new list with the updated item
-                                    val newList = itemStates.toMutableList()
-                                    newList[index] = item.copy(name = newName)
-                                    itemStates = newList
-                                },
-                                label = { Text("Nama Item") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                placeholder = { Text("Contoh: Indomie Goreng") }
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category) },
+                                onClick = {
+                                    selectedCategory = category
+                                    isExpanded = false
+                                }
                             )
-                            
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Items section
+                Text(
+                    "Daftar Item",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Display item list
+                if (itemStates.isEmpty()) {
+                    Text(
+                        "Belum ada item. Klik tombol + untuk menambahkan item.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(vertical = 16.dp)
+                    )
+                } else {
+                    itemStates.forEachIndexed { index, item ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
                             ) {
                                 OutlinedTextField(
-                                    value = item.quantity,
-                                    onValueChange = { newQty ->
-                                        // Update with only valid numbers
-                                        if (newQty.isEmpty() || newQty.all { it.isDigit() }) {
-                                            val newList = itemStates.toMutableList()
-                                            newList[index] = item.copy(quantity = newQty)
-                                            itemStates = newList
-                                        }
+                                    value = item.name,
+                                    onValueChange = { newName ->
+                                        // Create a new list with the updated item
+                                        val newList = itemStates.toMutableList()
+                                        newList[index] = item.copy(name = newName)
+                                        itemStates = newList
                                     },
-                                    label = { Text("Qty") },
-                                    modifier = Modifier.weight(1f),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    label = { Text("Nama Item") },
+                                    modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
-                                    placeholder = { Text("1") }
+                                    placeholder = { Text("Contoh: Indomie Goreng") }
                                 )
                                 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 
-                                OutlinedTextField(
-                                    value = item.price,
-                                    onValueChange = { newPrice ->
-                                        // Allow empty string, digits and single decimal point
-                                        if (newPrice.isEmpty() || 
-                                            newPrice.all { it.isDigit() || it == '.' } && 
-                                            newPrice.count { it == '.' } <= 1) {
-                                            val newList = itemStates.toMutableList()
-                                            newList[index] = item.copy(price = newPrice)
-                                            itemStates = newList
-                                        }
-                                    },
-                                    label = { Text("Harga") },
-                                    modifier = Modifier.weight(2f),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    singleLine = true,
-                                    placeholder = { Text("Contoh: 3500") }
-                                )
-                                
-                                IconButton(
-                                    onClick = { 
-                                        itemStates = itemStates.filterIndexed { i, _ -> i != index }
-                                    }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Hapus Item",
-                                        tint = MaterialTheme.colorScheme.error
+                                    OutlinedTextField(
+                                        value = item.quantity,
+                                        onValueChange = { newQty ->
+                                            // Update with only valid numbers
+                                            if (newQty.isEmpty() || newQty.all { it.isDigit() }) {
+                                                val newList = itemStates.toMutableList()
+                                                newList[index] = item.copy(quantity = newQty)
+                                                itemStates = newList
+                                            }
+                                        },
+                                        label = { Text("Qty") },
+                                        modifier = Modifier.weight(1f),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        singleLine = true,
+                                        placeholder = { Text("1") }
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    
+                                    OutlinedTextField(
+                                        value = item.price,
+                                        onValueChange = { newPrice ->
+                                            // Allow empty string, digits and single decimal point
+                                            if (newPrice.isEmpty() || 
+                                                newPrice.all { it.isDigit() || it == '.' } && 
+                                                newPrice.count { it == '.' } <= 1) {
+                                                val newList = itemStates.toMutableList()
+                                                newList[index] = item.copy(price = newPrice)
+                                                itemStates = newList
+                                            }
+                                        },
+                                        label = { Text("Harga") },
+                                        modifier = Modifier.weight(2f),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        singleLine = true,
+                                        placeholder = { Text("Contoh: 3500") }
+                                    )
+                                    
+                                    IconButton(
+                                        onClick = { 
+                                            itemStates = itemStates.filterIndexed { i, _ -> i != index }
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = "Hapus Item",
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                                
+                                // Tampilkan subtotal item
+                                val itemQty = item.quantity.toIntOrNull() ?: 0
+                                val itemPrice = item.price.toDoubleOrNull() ?: 0.0
+                                val itemTotal = itemQty * itemPrice
+                                
+                                if (itemTotal > 0) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Subtotal: ${currencyFormatter.format(itemTotal)}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.align(Alignment.End)
                                     )
                                 }
                             }
                         }
                     }
                 }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Total amount
-            OutlinedTextField(
-                value = totalAmount,
-                onValueChange = { newTotal ->
-                    // Allow only valid numbers for the total
-                    if (newTotal.isEmpty() || 
-                        newTotal.all { it.isDigit() || it == '.' } && 
-                        newTotal.count { it == '.' } <= 1) {
-                        totalAmount = newTotal
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Total section - Tampilkan total yang dihitung otomatis
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Total Struk",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = currencyFormatter.format(calculatedTotal),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Text(
+                            text = "Dihitung otomatis dari total semua item",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
-                },
-                label = { Text("Total (Rp)") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                placeholder = { Text("Contoh: 40000") }
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Calculate total from items
-            val calculatedTotal = itemStates.sumOf { 
-                val qty = it.quantity.toIntOrNull() ?: 0
-                val price = it.price.toDoubleOrNull() ?: 0.0
-                qty * price 
-            }
-            
-            if (calculatedTotal > 0) {
-                Text(
-                    "Total dari item: ${currencyFormatter.format(calculatedTotal)}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                }
+                
+                // Tampilkan pesan error jika ada
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = errorMessage ?: "",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+                
+                // Contoh data - ditambahkan untuk membantu pengguna
+                if (itemStates.isEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Contoh:",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    
+                    Text(
+                        "Merchant: Alfamart Jl. Sudirman\n" +
+                        "Tanggal: 2025-04-02\n" +
+                        "Kategori: Belanja\n\n" +
+                        "Item 1: Indomie Goreng, Qty: 5, Harga: 3500\n" +
+                        "Item 2: Aqua 600ml, Qty: 2, Harga: 4000\n" +
+                        "Item 3: Teh Pucuk Harum, Qty: 1, Harga: 5500\n" +
+                        "Item 4: Roti Tawar, Qty: 1, Harga: 12500\n\n" +
+                        "Total: 40000",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                
+                // Save button
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = saveReceipt,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSaving
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(Icons.Default.Save, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text("Simpan Struk", style = MaterialTheme.typography.titleMedium)
+                }
                 
                 Spacer(modifier = Modifier.height(16.dp))
             }
             
-            // Contoh data - ditambahkan untuk membantu pengguna
-            if (itemStates.isEmpty()) {
-                Text(
-                    "Contoh:",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                Text(
-                    "Merchant: Alfamart Jl. Sudirman\n" +
-                    "Tanggal: 2025-04-02\n" +
-                    "Kategori: Belanja\n\n" +
-                    "Item 1: Indomie Goreng, Qty: 5, Harga: 3500\n" +
-                    "Item 2: Aqua 600ml, Qty: 2, Harga: 4000\n" +
-                    "Item 3: Teh Pucuk Harum, Qty: 1, Harga: 5500\n" +
-                    "Item 4: Roti Tawar, Qty: 1, Harga: 12500\n\n" +
-                    "Total: 40000",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
+            // Overlay untuk proses penyimpanan
+            if (isSaving) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .padding(32.dp)
+                            .fillMaxWidth(0.8f),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(64.dp)
+                            )
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            Text(
+                                text = "Menyimpan Struk",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Text(
+                                text = "Mohon tunggu, data struk sedang disimpan ke database...",
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
             }
-            
-            // Save button
-            Button(
-                onClick = {
-                    // Here we would save the receipt
-                    // For now, just go back
-                    navController.popBackStack()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Simpan Struk")
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

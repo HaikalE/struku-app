@@ -8,7 +8,7 @@ data class CategoryEntity(
     @PrimaryKey
     val id: String,
     val name: String,
-    val color: Int,
+    val color: Long,
     val iconName: String,
     val isDefault: Boolean,
     val isUserDefined: Boolean

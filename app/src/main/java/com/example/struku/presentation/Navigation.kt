@@ -1,12 +1,8 @@
 package com.example.struku.presentation
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.struku.presentation.analytics.AnalyticsScreen
@@ -15,27 +11,9 @@ import com.example.struku.presentation.receipts.ReceiptsScreen
 import com.example.struku.presentation.scan.ScannerScreen
 import com.example.struku.presentation.settings.SettingsScreen
 
-// NavRoutes is already defined in NavRoutes.kt so no need to redefine it here
-
-/**
- * Main navigation host for the app
- */
-@Composable
-fun AppNavHost(
-    navController: NavHostController,
-    modifier: Modifier = Modifier
-) {
-    NavHost(
-        navController = navController,
-        startDestination = NavRoutes.RECEIPTS,
-        modifier = modifier
-    ) {
-        mainGraph(navController)
-    }
-}
-
 /**
  * Main navigation graph containing bottom tabs and other screens
+ * This file only contains navigation graph builders, the actual NavHost is in AppNavHost.kt
  */
 fun NavGraphBuilder.mainGraph(navController: NavController) {
     // Bottom navigation screens
@@ -46,7 +24,7 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
             },
             onAddClick = {
                 // Navigate to manual receipt entry screen
-                // navController.navigate(NavRoutes.RECEIPT_ADD)
+                navController.navigate(NavRoutes.RECEIPT_ADD)
             },
             onScanClick = {
                 navController.navigate(NavRoutes.SCANNER)
@@ -81,6 +59,12 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
     
     // Scanner screen
     composable(NavRoutes.SCANNER) {
+        ScannerScreen(navController)
+    }
+    
+    // Receipt scan screen
+    composable(NavRoutes.RECEIPT_SCAN) {
+        // Add your receipt scan screen implementation here
         ScannerScreen(navController)
     }
     

@@ -485,6 +485,9 @@ fun EmptyAnalyticsState() {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Get primary color from theme before Canvas call
+            val primaryColor = MaterialTheme.colorScheme.primary
+            
             // Simple doughnut chart illustration
             Canvas(modifier = Modifier.size(80.dp)) {
                 val radius = size.minDimension / 3
@@ -496,9 +499,9 @@ fun EmptyAnalyticsState() {
                     style = Stroke(width = radius / 2)
                 )
                 
-                // Draw a small segment
+                // Draw a small segment - using captured color instead of MaterialTheme.colorScheme inside Canvas
                 drawArc(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    color = primaryColor.copy(alpha = 0.7f),
                     startAngle = 0f,
                     sweepAngle = 90f,
                     useCenter = false,

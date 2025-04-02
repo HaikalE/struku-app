@@ -29,9 +29,9 @@ object NavRoutes {
     const val SETTINGS_BUDGETS = "settings_budgets"
     
     // Route helpers with arguments
-    fun receiptDetail(receiptId: Int) = "receipt_detail/$receiptId"
-    fun receiptEdit(receiptId: Int) = "receipt_edit/$receiptId"
-    fun receiptReview(receiptId: Int) = "receipt_review/$receiptId"
+    fun receiptDetail(receiptId: Long) = "receipt_detail/$receiptId"
+    fun receiptEdit(receiptId: Long) = "receipt_edit/$receiptId"
+    fun receiptReview(receiptId: Long) = "receipt_review/$receiptId"
     fun monthlyReport(year: Int, month: Int) = "monthly_report/$year/$month"
     fun categoryReport(categoryId: String) = "category_report/$categoryId"
 }

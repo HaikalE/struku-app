@@ -214,26 +214,26 @@ fun AddReceiptScreen(
         qty * price 
     }
     
-    // Function to save receipt with explicit Unit return type
-    val saveReceipt: () -> Unit = {
+    // Function to handle save button click
+    fun handleSave() {
         if (merchantName.isBlank()) {
             errorMessage = "Nama merchant harus diisi"
-            return@saveReceipt
+            return
         }
         
         if (date.isBlank()) {
             errorMessage = "Tanggal harus diisi"
-            return@saveReceipt
+            return
         }
         
         if (selectedCategory.isBlank()) {
             errorMessage = "Kategori harus dipilih"
-            return@saveReceipt
+            return
         }
         
         if (itemStates.isEmpty()) {
             errorMessage = "Tambahkan minimal satu item"
-            return@saveReceipt
+            return
         }
         
         // Parse date
@@ -242,24 +242,27 @@ fun AddReceiptScreen(
             dateFormat.parse(date) ?: Date()
         } catch (e: Exception) {
             errorMessage = "Format tanggal tidak valid (YYYY-MM-DD)"
-            return@saveReceipt
+            return
         }
         
         // Convert items
-        val lineItems = itemStates.mapNotNull { state ->
-            val quantity = state.quantity.toIntOrNull() ?: return@mapNotNull null
-            val price = state.price.toDoubleOrNull() ?: return@mapNotNull null
+        val lineItemsList = mutableListOf<LineItem>()
+        for (state in itemStates) {
+            val quantity = state.quantity.toIntOrNull()
+            val price = state.price.toDoubleOrNull()
             
-            LineItem(
-                description = state.name,
-                quantity = quantity,
-                price = price
+            if (quantity == null || price == null) {
+                errorMessage = "Semua item harus diisi dengan benar"
+                return
+            }
+            
+            lineItemsList.add(
+                LineItem(
+                    description = state.name,
+                    quantity = quantity,
+                    price = price
+                )
             )
-        }
-        
-        if (lineItems.size != itemStates.size) {
-            errorMessage = "Semua item harus diisi dengan benar"
-            return@saveReceipt
         }
         
         // Create receipt object
@@ -268,7 +271,7 @@ fun AddReceiptScreen(
             date = parsedDate,
             category = selectedCategory,
             total = calculatedTotal,
-            items = lineItems,
+            items = lineItemsList,
             createdAt = Date(),
             updatedAt = Date()
         )
@@ -369,7 +372,7 @@ fun AddReceiptScreen(
             FloatingActionButton(
                 onClick = {
                     // Add a new empty item to the list with a unique ID
-                    val newId = if (itemStates.isEmpty()) 1 else itemStates.maxBy { it.id }.id + 1
+                    val newId = if (itemStates.isEmpty()) 1 else itemStates.maxByOrNull { it.id }?.id?.plus(1) ?: 1
                     itemStates = itemStates + ReceiptItemState(newId, "", "1", "")
                 }
             ) {
@@ -642,7 +645,7 @@ fun AddReceiptScreen(
                 // Save button
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
-                    onClick = saveReceipt,
+                    onClick = { handleSave() },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isSaving
                 ) {

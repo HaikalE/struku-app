@@ -22,12 +22,12 @@ interface ReceiptRepository {
     /**
      * Menghapus struk berdasarkan ID
      */
-    suspend fun deleteReceipt(receiptId: Int)
+    suspend fun deleteReceipt(receiptId: Long)
     
     /**
      * Mendapatkan struk berdasarkan ID
      */
-    suspend fun getReceiptById(receiptId: Int): Receipt?
+    suspend fun getReceiptById(receiptId: Long): Receipt?
     
     /**
      * Mendapatkan semua struk, diurutkan berdasarkan tanggal terbaru

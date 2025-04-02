@@ -1,6 +1,7 @@
 package com.example.struku.di
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import com.example.struku.data.local.AppDatabase
 import com.example.struku.data.local.dao.BudgetDao
@@ -20,6 +21,8 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    private const val TAG = "DatabaseModule"
+
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
@@ -27,6 +30,8 @@ object DatabaseModule {
         // In a real app, this should be securely stored/generated
         val passphrase = SQLiteDatabase.getBytes("struku-password".toCharArray())
         val factory = SupportFactory(passphrase)
+        
+        Log.d(TAG, "Creating AppDatabase instance")
         
         return Room.databaseBuilder(
             context,
@@ -39,14 +44,30 @@ object DatabaseModule {
     }
 
     @Provides
-    fun provideReceiptDao(database: AppDatabase): ReceiptDao = database.receiptDao()
+    @Singleton
+    fun provideReceiptDao(database: AppDatabase): ReceiptDao {
+        Log.d(TAG, "Providing ReceiptDao")
+        return database.receiptDao()
+    }
 
     @Provides
-    fun provideLineItemDao(database: AppDatabase): LineItemDao = database.lineItemDao()
+    @Singleton
+    fun provideLineItemDao(database: AppDatabase): LineItemDao {
+        Log.d(TAG, "Providing LineItemDao")
+        return database.lineItemDao()
+    }
 
     @Provides
-    fun provideCategoryDao(database: AppDatabase): CategoryDao = database.categoryDao()
+    @Singleton
+    fun provideCategoryDao(database: AppDatabase): CategoryDao {
+        Log.d(TAG, "Providing CategoryDao")
+        return database.categoryDao()
+    }
 
     @Provides
-    fun provideBudgetDao(database: AppDatabase): BudgetDao = database.budgetDao()
+    @Singleton
+    fun provideBudgetDao(database: AppDatabase): BudgetDao {
+        Log.d(TAG, "Providing BudgetDao")
+        return database.budgetDao()
+    }
 }

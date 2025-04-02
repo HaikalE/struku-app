@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
@@ -39,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -61,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.struku.R
@@ -85,8 +88,8 @@ fun ReceiptReviewScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     
-    // Menampilkan dialog sukses
-    var showSuccessDialog by remember { mutableStateOf(false) }
+    // Variable untuk menampilkan dialog setelah save berhasil
+    var showSavedDialog by remember { mutableStateOf(false) }
     
     // Load receipt data
     LaunchedEffect(receiptId) {
@@ -96,42 +99,63 @@ fun ReceiptReviewScreen(
     // Process save completion
     LaunchedEffect(state.saveCompleted) {
         if (state.saveCompleted) {
-            // Tampilkan dialog sukses
-            showSuccessDialog = true
-            
-            // Tunggu sebentar agar user bisa melihat dialog
-            delay(1500)
-            
-            // Navigate to receipts screen setelah dialog ditampilkan
-            navController.navigate(NavRoutes.RECEIPTS) {
-                popUpTo(NavRoutes.RECEIPTS) {
-                    inclusive = true
-                }
-            }
+            showSavedDialog = true
         }
     }
     
-    // Tampilkan dialog sukses jika proses penyimpanan sudah selesai
-    if (showSuccessDialog) {
-        AlertDialog(
-            onDismissRequest = { showSuccessDialog = false },
-            title = { Text("Sukses") },
-            text = { Text("Struk berhasil disimpan dan akan ditampilkan di daftar struk") },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        showSuccessDialog = false
-                        navController.navigate(NavRoutes.RECEIPTS) {
-                            popUpTo(NavRoutes.RECEIPTS) {
-                                inclusive = true
-                            }
-                        }
-                    }
+    // Dialog konfirmasi sukses
+    if (showSavedDialog) {
+        Dialog(onDismissRequest = { /* Dialog tidak bisa ditutup dengan klik di luar */ }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Lihat Daftar Struk")
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "Struk Berhasil Disimpan!",
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "Struk Anda telah berhasil disimpan ke database. Anda dapat melihat daftar struk di halaman utama.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = {
+                            showSavedDialog = false
+                            navController.navigate(NavRoutes.RECEIPTS) {
+                                popUpTo(NavRoutes.RECEIPTS) {
+                                    inclusive = true
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Lihat Daftar Struk")
+                    }
                 }
             }
-        )
+        }
     }
     
     Scaffold(
@@ -189,28 +213,40 @@ fun ReceiptReviewScreen(
                 }
             }
             
-            // Overlay untuk menunjukkan proses penyimpanan sedang berlangsung
+            // Overlay untuk proses penyimpanan
             if (state.isSaving) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.5f)),
+                        .background(Color.Black.copy(alpha = 0.6f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Card(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier
+                            .padding(32.dp)
+                            .fillMaxWidth(0.8f),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
                         Column(
                             modifier = Modifier.padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier.size(64.dp)
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
                             Text(
-                                text = "Menyimpan struk...",
-                                style = MaterialTheme.typography.titleMedium
+                                text = "Menyimpan Struk",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Text(
+                                text = "Mohon tunggu, data struk sedang disimpan ke database...",
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -235,6 +271,7 @@ fun ReceiptReviewContent(
 ) {
     val receipt = state.receipt ?: return
     val scrollState = rememberScrollState()
+    val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
     
     Column(
         modifier = Modifier
@@ -293,17 +330,46 @@ fun ReceiptReviewContent(
         Spacer(modifier = Modifier.height(8.dp))
         
         // Line items list
-        receipt.items.forEachIndexed { index, item ->
-            LineItemRow(
-                item = item,
-                onDescriptionChange = { onItemDescriptionChange(index, it) },
-                onQuantityChange = { onItemQuantityChange(index, it) },
-                onPriceChange = { onItemPriceChange(index, it) },
-                onRemove = { onRemoveItem(index) }
-            )
-            
-            if (index < receipt.items.size - 1) {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+        if (receipt.items.isEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Belum ada item",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Tambahkan item untuk dihitung totalnya secara otomatis",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            receipt.items.forEachIndexed { index, item ->
+                LineItemRow(
+                    item = item,
+                    onDescriptionChange = { onItemDescriptionChange(index, it) },
+                    onQuantityChange = { onItemQuantityChange(index, it) },
+                    onPriceChange = { onItemPriceChange(index, it) },
+                    onRemove = { onRemoveItem(index) }
+                )
+                
+                if (index < receipt.items.size - 1) {
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                }
             }
         }
         
@@ -321,34 +387,55 @@ fun ReceiptReviewContent(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Total section
-        val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
-        OutlinedTextField(
-            value = currencyFormatter.format(receipt.total),
-            onValueChange = { /* read-only, dihitung otomatis */ },
-            label = { Text(stringResource(id = R.string.receipt_total)) },
+        // Total section - hanya menampilkan, bukan input
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            readOnly = true,
-            singleLine = true
-        )
-        
-        // Informasi tentang total otomatis
-        Text(
-            text = "Total dihitung otomatis dari total harga semua item",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
-        )
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Total Struk",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = currencyFormatter.format(receipt.total),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Text(
+                    text = "Dihitung otomatis dari total semua item",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
         
         // Error message if any
         if (state.error != null) {
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = state.error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                Text(
+                    text = state.error,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
         }
         
         // Save button with enhanced design
@@ -359,8 +446,8 @@ fun ReceiptReviewContent(
             enabled = !state.isLoading && !state.isSaving
         ) {
             Icon(Icons.Default.Save, contentDescription = null)
-            Spacer(modifier = Modifier.padding(4.dp))
-            Text("Simpan Struk")
+            Spacer(modifier = Modifier.padding(8.dp))
+            Text("Simpan Struk", style = MaterialTheme.typography.titleMedium)
         }
         
         // Extra space at bottom for better scrolling
@@ -448,7 +535,10 @@ fun LineItemRow(
                     value = item.quantity.toString(),
                     onValueChange = { 
                         try {
-                            onQuantityChange(it.toInt())
+                            val newQty = it.toIntOrNull() ?: return@OutlinedTextField
+                            if (newQty > 0) {
+                                onQuantityChange(newQty)
+                            }
                         } catch (e: NumberFormatException) {
                             // Ignore invalid input
                         }
@@ -465,7 +555,10 @@ fun LineItemRow(
                     value = item.price.toString(),
                     onValueChange = { 
                         try {
-                            onPriceChange(it.toDouble())
+                            val newPrice = it.toDoubleOrNull() ?: return@OutlinedTextField
+                            if (newPrice >= 0) {
+                                onPriceChange(newPrice)
+                            }
                         } catch (e: NumberFormatException) {
                             // Ignore invalid input
                         }

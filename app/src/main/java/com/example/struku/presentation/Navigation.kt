@@ -43,12 +43,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -134,9 +132,10 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
     
     // Receipt add screen (previously missing)
     composable(NavRoutes.RECEIPT_ADD) {
+        val viewModel = hiltViewModel<AddReceiptViewModel>()
         AddReceiptScreen(
             navController = navController,
-            receiptRepository = hiltViewModel<AddReceiptViewModel>().repository
+            receiptRepository = viewModel.repository
         )
     }
     
@@ -215,8 +214,8 @@ fun AddReceiptScreen(
         qty * price 
     }
     
-    // Function to save receipt - explicit return type to fix Kotlin compiler error
-    val saveReceipt: () -> Unit = {
+    // Function to save receipt
+    val saveReceipt = {
         if (merchantName.isBlank()) {
             errorMessage = "Nama merchant harus diisi"
             return@saveReceipt
@@ -370,7 +369,7 @@ fun AddReceiptScreen(
             FloatingActionButton(
                 onClick = {
                     // Add a new empty item to the list with a unique ID
-                    val newId = if (itemStates.isEmpty()) 1 else itemStates.maxOf { it.id } + 1
+                    val newId = if (itemStates.isEmpty()) 1 else itemStates.maxBy { it.id }.id + 1
                     itemStates = itemStates + ReceiptItemState(newId, "", "1", "")
                 }
             ) {

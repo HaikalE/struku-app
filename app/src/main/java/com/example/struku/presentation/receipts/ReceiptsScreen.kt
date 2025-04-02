@@ -31,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.struku.R
 import com.example.struku.domain.model.Receipt
+import com.example.struku.presentation.NavRoutes
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -50,7 +51,7 @@ fun ReceiptsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { /* TODO: Navigate to scan screen */ }) {
+            FloatingActionButton(onClick = { navController.navigate(NavRoutes.SCANNER) }) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(id = R.string.action_scan))
             }
         }
@@ -70,7 +71,7 @@ fun ReceiptsScreen(
                     ReceiptsList(
                         receipts = state.receipts,
                         onReceiptClick = { receiptId ->
-                            // TODO: Navigate to receipt details
+                            navController.navigate(NavRoutes.receiptDetail(receiptId))
                         }
                     )
                 }

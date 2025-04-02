@@ -4,7 +4,9 @@ import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
 
 /**
- * Main application class with Hilt dependency injection
+ * Application class untuk Struku App.
+ * 
+ * Digunakan untuk inisialisasi dependency injection dengan Hilt.
  */
 @HiltAndroidApp
 class StrukuApplication : Application()

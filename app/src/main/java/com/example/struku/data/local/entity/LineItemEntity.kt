@@ -19,8 +19,8 @@ import androidx.room.PrimaryKey
 )
 data class LineItemEntity(
     @PrimaryKey(autoGenerate = true)
-    val id: Int = 0,
-    val receiptId: Int,
+    val id: Long = 0,
+    val receiptId: Long,
     val description: String,
     val quantity: Int,
     val unitPrice: Double?,

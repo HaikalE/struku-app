@@ -1,5 +1,6 @@
 package com.example.struku.presentation.scan
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -17,6 +20,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,6 +33,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +54,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -58,6 +67,7 @@ import com.example.struku.R
 import com.example.struku.domain.model.Category
 import com.example.struku.domain.model.LineItem
 import com.example.struku.presentation.NavRoutes
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -75,6 +85,9 @@ fun ReceiptReviewScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     
+    // Menampilkan dialog sukses
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    
     // Load receipt data
     LaunchedEffect(receiptId) {
         viewModel.loadReceipt(receiptId)
@@ -83,18 +96,42 @@ fun ReceiptReviewScreen(
     // Process save completion
     LaunchedEffect(state.saveCompleted) {
         if (state.saveCompleted) {
-            // Show success message and navigate to receipts screen
-            scope.launch {
-                snackbarHostState.showSnackbar("Struk berhasil disimpan")
-            }
+            // Tampilkan dialog sukses
+            showSuccessDialog = true
             
-            // Navigate to receipts screen instead of just popping back
+            // Tunggu sebentar agar user bisa melihat dialog
+            delay(1500)
+            
+            // Navigate to receipts screen setelah dialog ditampilkan
             navController.navigate(NavRoutes.RECEIPTS) {
                 popUpTo(NavRoutes.RECEIPTS) {
                     inclusive = true
                 }
             }
         }
+    }
+    
+    // Tampilkan dialog sukses jika proses penyimpanan sudah selesai
+    if (showSuccessDialog) {
+        AlertDialog(
+            onDismissRequest = { showSuccessDialog = false },
+            title = { Text("Sukses") },
+            text = { Text("Struk berhasil disimpan dan akan ditampilkan di daftar struk") },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showSuccessDialog = false
+                        navController.navigate(NavRoutes.RECEIPTS) {
+                            popUpTo(NavRoutes.RECEIPTS) {
+                                inclusive = true
+                            }
+                        }
+                    }
+                ) {
+                    Text("Lihat Daftar Struk")
+                }
+            }
+        )
     }
     
     Scaffold(
@@ -110,7 +147,7 @@ fun ReceiptReviewScreen(
                 actions = {
                     IconButton(
                         onClick = { viewModel.saveReceipt() },
-                        enabled = !state.isLoading
+                        enabled = !state.isLoading && !state.isSaving
                     ) {
                         Icon(Icons.Default.Check, contentDescription = "Save")
                     }
@@ -142,7 +179,6 @@ fun ReceiptReviewScreen(
                         onSaveClick = { viewModel.saveReceipt() },
                         onMerchantNameChange = viewModel::updateMerchantName,
                         onDateChange = viewModel::updateDate,
-                        onTotalChange = viewModel::updateTotal,
                         onCategoryChange = viewModel::updateCategory,
                         onItemDescriptionChange = viewModel::updateItemDescription,
                         onItemQuantityChange = viewModel::updateItemQuantity,
@@ -150,6 +186,34 @@ fun ReceiptReviewScreen(
                         onAddItem = viewModel::addLineItem,
                         onRemoveItem = viewModel::removeLineItem
                     )
+                }
+            }
+            
+            // Overlay untuk menunjukkan proses penyimpanan sedang berlangsung
+            if (state.isSaving) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Menyimpan struk...",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -162,7 +226,6 @@ fun ReceiptReviewContent(
     onSaveClick: () -> Unit,
     onMerchantNameChange: (String) -> Unit,
     onDateChange: (Date) -> Unit,
-    onTotalChange: (Double) -> Unit,
     onCategoryChange: (String) -> Unit,
     onItemDescriptionChange: (Int, String) -> Unit,
     onItemQuantityChange: (Int, Int) -> Unit,
@@ -261,17 +324,20 @@ fun ReceiptReviewContent(
         // Total section
         val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
         OutlinedTextField(
-            value = receipt.total.toString(),
-            onValueChange = { 
-                try {
-                    onTotalChange(it.toDouble())
-                } catch (e: NumberFormatException) {
-                    // Ignore invalid input
-                }
-            },
+            value = currencyFormatter.format(receipt.total),
+            onValueChange = { /* read-only, dihitung otomatis */ },
             label = { Text(stringResource(id = R.string.receipt_total)) },
             modifier = Modifier.fillMaxWidth(),
+            readOnly = true,
             singleLine = true
+        )
+        
+        // Informasi tentang total otomatis
+        Text(
+            text = "Total dihitung otomatis dari total harga semua item",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
         )
         
         // Error message if any
@@ -285,12 +351,15 @@ fun ReceiptReviewContent(
             )
         }
         
-        // Save button - Fix: Call the saveReceipt function
+        // Save button with enhanced design
         Spacer(modifier = Modifier.height(24.dp))
         Button(
             onClick = onSaveClick,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isLoading && !state.isSaving
         ) {
+            Icon(Icons.Default.Save, contentDescription = null)
+            Spacer(modifier = Modifier.padding(4.dp))
             Text("Simpan Struk")
         }
         
@@ -350,6 +419,9 @@ fun LineItemRow(
     onPriceChange: (Double) -> Unit,
     onRemove: () -> Unit
 ) {
+    val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+    val calculatedItemTotal = item.quantity * item.price
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -416,6 +488,20 @@ fun LineItemRow(
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
+            }
+            
+            // Item subtotal
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = "Subtotal: ${currencyFormatter.format(calculatedItemTotal)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }

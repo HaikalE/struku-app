@@ -148,9 +148,9 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
     // Receipt detail screen
     composable(
         route = NavRoutes.RECEIPT_DETAIL,
-        arguments = listOf(navArgument("receiptId") { type = NavType.IntType })
+        arguments = listOf(navArgument("receiptId") { type = NavType.LongType })
     ) { backStackEntry ->
-        val receiptId = backStackEntry.arguments?.getInt("receiptId") ?: 0
+        val receiptId = backStackEntry.arguments?.getLong("receiptId") ?: 0L
         ReceiptDetailScreen(receiptId, navController)
     }
     

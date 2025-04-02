@@ -75,5 +75,6 @@ fun AuthenticationScreen(onAuthenticate: () -> Unit) {
  */
 @Composable
 fun AuthenticatedApp() {
+    // Use the StrukuApp composable with navigation
     com.example.struku.presentation.StrukuApp()
 }

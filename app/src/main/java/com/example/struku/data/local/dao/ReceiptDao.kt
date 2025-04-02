@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.ColumnInfo
 import com.example.struku.data.local.entity.ReceiptEntity
 import com.example.struku.data.local.relation.ReceiptWithItems
 import kotlinx.coroutines.flow.Flow
@@ -42,14 +43,38 @@ interface ReceiptDao {
     @Query("SELECT * FROM receipts WHERE category = :category ORDER BY date DESC")
     fun getReceiptsByCategory(category: String): Flow<List<ReceiptWithItems>>
     
-    @Query("SELECT category, SUM(total) as total FROM receipts WHERE date BETWEEN :startDate AND :endDate GROUP BY category")
-    suspend fun getTotalByCategory(startDate: Date, endDate: Date): Map<String, Double>
+    // Define a data class for category totals
+    data class CategoryTotal(
+        @ColumnInfo(name = "category") val category: String,
+        @ColumnInfo(name = "total") val total: Double
+    )
     
+    // Fixed query to return a list of data class objects instead of a Map
+    @Query("SELECT category, SUM(total) as total FROM receipts WHERE date BETWEEN :startDate AND :endDate GROUP BY category")
+    suspend fun getCategoryTotals(startDate: Date, endDate: Date): List<CategoryTotal>
+    
+    // Define a data class for monthly totals
+    data class MonthlyTotal(
+        @ColumnInfo(name = "yearMonth") val yearMonth: String,
+        @ColumnInfo(name = "total") val total: Double
+    )
+    
+    // Fixed query to return a list of data class objects instead of a Map
     @Query(
         "SELECT strftime('%Y-%m', date / 1000, 'unixepoch') as yearMonth, SUM(total) as total " +
         "FROM receipts " +
         "WHERE date BETWEEN :startDate AND :endDate " +
         "GROUP BY yearMonth"
     )
-    suspend fun getTotalByMonth(startDate: Date, endDate: Date): Map<String, Double>
+    suspend fun getMonthlyTotals(startDate: Date, endDate: Date): List<MonthlyTotal>
+    
+    // Extension function to convert CategoryTotal list to Map if needed
+    fun List<CategoryTotal>.toMap(): Map<String, Double> {
+        return this.associate { it.category to it.total }
+    }
+    
+    // Extension function to convert MonthlyTotal list to Map if needed
+    fun List<MonthlyTotal>.toMap(): Map<String, Double> {
+        return this.associate { it.yearMonth to it.total }
+    }
 }

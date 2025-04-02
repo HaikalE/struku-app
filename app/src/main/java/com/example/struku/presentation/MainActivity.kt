@@ -9,6 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
 import com.example.struku.presentation.auth.AuthManager
 import com.example.struku.presentation.auth.AuthState
 import com.example.struku.presentation.auth.AuthenticationScreen
@@ -18,7 +19,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     
     @Inject
     lateinit var authManager: AuthManager

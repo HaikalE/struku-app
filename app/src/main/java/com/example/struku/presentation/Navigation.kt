@@ -215,8 +215,8 @@ fun AddReceiptScreen(
         qty * price 
     }
     
-    // Function to save receipt
-    val saveReceipt = {
+    // Function to save receipt - explicit return type to fix Kotlin compiler error
+    val saveReceipt: () -> Unit = {
         if (merchantName.isBlank()) {
             errorMessage = "Nama merchant harus diisi"
             return@saveReceipt

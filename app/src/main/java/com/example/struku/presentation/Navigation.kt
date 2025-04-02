@@ -67,8 +67,11 @@ import com.example.struku.domain.repository.ReceiptRepository
 import com.example.struku.presentation.analytics.AnalyticsScreen
 import com.example.struku.presentation.receipts.ReceiptDetailScreen
 import com.example.struku.presentation.receipts.ReceiptsScreen
+import com.example.struku.presentation.scan.ReceiptReviewScreen
 import com.example.struku.presentation.scan.ScannerScreen
 import com.example.struku.presentation.settings.ExportScreen
+import com.example.struku.presentation.settings.ManageBudgetsScreen
+import com.example.struku.presentation.settings.ManageCategoriesScreen
 import com.example.struku.presentation.settings.SettingsScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -154,17 +157,82 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
         ReceiptDetailScreen(receiptId, navController)
     }
     
+    // Receipt review screen
+    composable(
+        route = NavRoutes.RECEIPT_REVIEW,
+        arguments = listOf(navArgument("receiptId") { type = NavType.LongType })
+    ) { backStackEntry ->
+        val receiptId = backStackEntry.arguments?.getLong("receiptId") ?: 0L
+        ReceiptReviewScreen(receiptId, navController)
+    }
+    
     // Settings screens
     composable(NavRoutes.SETTINGS_EXPORT) {
         ExportScreen(navController)
     }
     
     composable(NavRoutes.SETTINGS_CATEGORIES) {
-        SettingsCategoriesScreen(navController)
+        ManageCategoriesScreen(navController)
     }
     
     composable(NavRoutes.SETTINGS_BUDGETS) {
-        SettingsBudgetsScreen(navController)
+        ManageBudgetsScreen(navController)
+    }
+    
+    // Analytics detailed screens
+    composable(
+        route = NavRoutes.MONTHLY_REPORT,
+        arguments = listOf(
+            navArgument("year") { type = NavType.IntType },
+            navArgument("month") { type = NavType.IntType }
+        )
+    ) { backStackEntry ->
+        val year = backStackEntry.arguments?.getInt("year") ?: 0
+        val month = backStackEntry.arguments?.getInt("month") ?: 0
+        // Use the same analytics screen with different parameters
+        AnalyticsScreen(
+            onMonthClick = { y, m ->
+                navController.navigate(NavRoutes.monthlyReport(y, m)) {
+                    popUpTo(NavRoutes.monthlyReport(year, month)) {
+                        inclusive = true
+                    }
+                }
+            },
+            onCategoryClick = { categoryId ->
+                navController.navigate(NavRoutes.categoryReport(categoryId))
+            }
+        )
+    }
+    
+    composable(
+        route = NavRoutes.CATEGORY_REPORT,
+        arguments = listOf(navArgument("categoryId") { type = NavType.StringType })
+    ) { backStackEntry ->
+        val categoryId = backStackEntry.arguments?.getString("categoryId") ?: ""
+        // For "budgets" category, navigate to the budget management screen
+        if (categoryId == "budgets") {
+            ManageBudgetsScreen(navController)
+        } else {
+            // For other categories, show category detail screen
+            // This is just a placeholder that will show the category ID
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Detail Kategori: $categoryId",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Button(onClick = { navController.popBackStack() }) {
+                        Text("Kembali")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -705,64 +773,6 @@ fun AddReceiptScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-/**
- * Temporary screen for categories settings
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsCategoriesScreen(navController: NavController) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Kategori") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Pengaturan Kategori")
-        }
-    }
-}
-
-/**
- * Temporary screen for budget settings
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsBudgetsScreen(navController: NavController) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Anggaran") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Pengaturan Anggaran")
         }
     }
 }

@@ -1,12 +1,14 @@
 package com.example.struku.domain.model
 
+import androidx.compose.ui.graphics.Color
+
 /**
  * Model domain untuk kategori pengeluaran
  */
 data class Category(
     val id: String,
     val name: String,
-    val color: Int,
+    val color: Long,
     val iconName: String,
     val isDefault: Boolean = false,
     val isUserDefined: Boolean = false
@@ -26,5 +28,10 @@ data class Category(
         val DEFAULT_CATEGORIES = listOf(
             GROCERIES, DINING, TRANSPORT, SHOPPING, UTILITIES, HEALTH, ENTERTAINMENT, OTHER
         )
+        
+        // Utility function to convert color Long to Compose Color
+        fun Long.toComposeColor(): Color {
+            return Color(this)
+        }
     }
 }

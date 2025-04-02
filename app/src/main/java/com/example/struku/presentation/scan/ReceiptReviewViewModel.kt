@@ -45,7 +45,7 @@ class ReceiptReviewViewModel @Inject constructor(
         }
     }
     
-    fun loadReceipt(receiptId: Int) {
+    fun loadReceipt(receiptId: Long) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             
@@ -217,5 +217,5 @@ data class ReceiptReviewState(
     val error: String? = null,
     val saveCompleted: Boolean = false,
     val saveMessage: String? = null,
-    val savedReceiptId: Int? = null
+    val savedReceiptId: Long? = null
 )

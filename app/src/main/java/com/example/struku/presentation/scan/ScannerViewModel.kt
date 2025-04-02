@@ -28,7 +28,7 @@ class ScannerViewModel @Inject constructor(
                 if (receiptId != null) {
                     _state.update { it.copy(
                         isLoading = false,
-                        scannedReceiptId = receiptId.toInt()
+                        scannedReceiptId = receiptId
                     ) }
                 } else {
                     _state.update { it.copy(
@@ -53,5 +53,5 @@ class ScannerViewModel @Inject constructor(
 data class ScannerState(
     val isLoading: Boolean = false,
     val error: String? = null,
-    val scannedReceiptId: Int? = null
+    val scannedReceiptId: Long? = null
 )

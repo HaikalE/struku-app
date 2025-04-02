@@ -64,10 +64,16 @@ class ReceiptRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getTotalByCategory(startDate: Date, endDate: Date): Map<String, Double> {
-        return receiptDao.getTotalByCategory(startDate, endDate)
+        // Use the new getCategoryTotals method and convert the result to Map
+        return receiptDao.getCategoryTotals(startDate, endDate).associate { 
+            it.category to it.total 
+        }
     }
 
     override suspend fun getTotalByMonth(startDate: Date, endDate: Date): Map<String, Double> {
-        return receiptDao.getTotalByMonth(startDate, endDate)
+        // Use the new getMonthlyTotals method and convert the result to Map
+        return receiptDao.getMonthlyTotals(startDate, endDate).associate { 
+            it.yearMonth to it.total 
+        }
     }
 }

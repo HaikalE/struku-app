@@ -8,6 +8,7 @@ import com.example.struku.domain.model.Receipt
 import com.example.struku.domain.repository.CategoryRepository
 import com.example.struku.domain.repository.ReceiptRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -51,6 +52,9 @@ class ReceiptReviewViewModel @Inject constructor(
             try {
                 val receipt = receiptRepository.getReceiptById(receiptId)
                 _state.update { it.copy(isLoading = false, receipt = receipt) }
+                
+                // Calculate total automatically
+                receipt?.let { calculateTotal() }
             } catch (e: Exception) {
                 _state.update { it.copy(
                     isLoading = false,
@@ -74,10 +78,18 @@ class ReceiptReviewViewModel @Inject constructor(
         }
     }
     
-    fun updateTotal(total: Double) {
+    // Disable manual total update - now calculated automatically
+    private fun updateTotalInternal(total: Double) {
         _state.update { state ->
             val receipt = state.receipt ?: return@update state
             state.copy(receipt = receipt.copy(total = total))
+        }
+    }
+    
+    fun calculateTotal() {
+        _state.value.receipt?.let { receipt ->
+            val newTotal = receipt.items.sumOf { item -> item.quantity * item.price }
+            updateTotalInternal(newTotal)
         }
     }
     
@@ -112,6 +124,8 @@ class ReceiptReviewViewModel @Inject constructor(
                 state
             }
         }
+        // Recalculate total when quantity changes
+        calculateTotal()
     }
     
     fun updateItemPrice(index: Int, price: Double) {
@@ -125,6 +139,8 @@ class ReceiptReviewViewModel @Inject constructor(
                 state
             }
         }
+        // Recalculate total when price changes
+        calculateTotal()
     }
     
     fun addLineItem() {
@@ -152,24 +168,40 @@ class ReceiptReviewViewModel @Inject constructor(
                 state
             }
         }
+        // Recalculate total when an item is removed
+        calculateTotal()
     }
     
     fun saveReceipt() {
         viewModelScope.launch {
             val receipt = _state.value.receipt ?: return@launch
             
-            _state.update { it.copy(isLoading = true, error = null) }
+            // Calculate the total one final time before saving
+            calculateTotal()
+            
+            _state.update { it.copy(isLoading = true, error = null, isSaving = true) }
             
             try {
-                receiptRepository.updateReceipt(receipt)
+                // Tunggu sebentar untuk memberikan visual feedback
+                delay(500)
+                
+                // Dapatkan receipt yang sudah dihitung totalnya dari state terbaru
+                val updatedReceipt = _state.value.receipt ?: return@launch
+                
+                // Lakukan penyimpanan dengan total yang sudah dihitung
+                receiptRepository.updateReceipt(updatedReceipt)
+                
                 _state.update { it.copy(
                     isLoading = false,
+                    isSaving = false,
                     saveCompleted = true,
-                    saveMessage = "Struk berhasil disimpan"
+                    saveMessage = "Struk berhasil disimpan",
+                    savedReceiptId = updatedReceipt.id
                 ) }
             } catch (e: Exception) {
                 _state.update { it.copy(
                     isLoading = false,
+                    isSaving = false,
                     error = "Gagal menyimpan struk: ${e.message}"
                 ) }
             }
@@ -179,9 +211,11 @@ class ReceiptReviewViewModel @Inject constructor(
 
 data class ReceiptReviewState(
     val isLoading: Boolean = false,
+    val isSaving: Boolean = false,
     val receipt: Receipt? = null,
     val availableCategories: List<Category> = emptyList(),
     val error: String? = null,
     val saveCompleted: Boolean = false,
-    val saveMessage: String? = null
+    val saveMessage: String? = null,
+    val savedReceiptId: Int? = null
 )

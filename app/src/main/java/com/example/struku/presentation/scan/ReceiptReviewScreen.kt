@@ -80,7 +80,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiptReviewScreen(
-    receiptId: Int,
+    receiptId: Long,
     navController: NavController,
     viewModel: ReceiptReviewViewModel = hiltViewModel()
 ) {

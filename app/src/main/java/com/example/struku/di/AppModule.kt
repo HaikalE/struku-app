@@ -2,6 +2,7 @@ package com.example.struku.di
 
 import android.content.Context
 import com.example.struku.presentation.auth.AuthManager
+import com.example.struku.util.DataExporter
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,5 +24,14 @@ object AppModule {
     @Singleton
     fun provideAuthManager(@ApplicationContext context: Context): AuthManager {
         return AuthManager(context)
+    }
+    
+    /**
+     * Provides DataExporter as a singleton
+     */
+    @Provides
+    @Singleton
+    fun provideDataExporter(@ApplicationContext context: Context): DataExporter {
+        return DataExporter(context)
     }
 }

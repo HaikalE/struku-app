@@ -61,8 +61,10 @@ fun ExportScreen(
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
                 state.error != null -> {
+                    // Use safe unwrapping of error
+                    val errorText = state.error ?: "Unknown error"
                     Text(
-                        text = state.error,
+                        text = errorText,
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
@@ -132,9 +134,9 @@ fun ExportContent(
         }
         
         // Message if any
-        message?.let {
+        if (message != null) {
             Text(
-                text = it,
+                text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center,

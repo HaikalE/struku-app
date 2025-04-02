@@ -19,9 +19,9 @@ class ReceiptDetailViewModel @Inject constructor(
     private val _state = MutableStateFlow(ReceiptDetailState())
     val state: StateFlow<ReceiptDetailState> = _state
     
-    private var currentReceiptId: Int = 0
+    private var currentReceiptId: Long = 0L
     
-    fun loadReceipt(receiptId: Int) {
+    fun loadReceipt(receiptId: Long) {
         currentReceiptId = receiptId
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }

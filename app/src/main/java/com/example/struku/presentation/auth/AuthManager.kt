@@ -1,16 +1,18 @@
 package com.example.struku.presentation.auth
 
 import android.content.Context
+import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
 import com.example.struku.util.BiometricHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
 
 /**
  * Manager for handling app authentication
  */
-class AuthManager(private val context: Context) {
+class AuthManager @Inject constructor(private val context: Context) {
     
     private val biometricHelper = BiometricHelper(context)
     
@@ -43,8 +45,8 @@ class AuthManager(private val context: Context) {
                 _authState.value = AuthState.UNLOCKED
             },
             onError = { errorCode, errorMessage ->
-                if (errorCode == BiometricHelper.ERROR_NEGATIVE_BUTTON || 
-                    errorCode == BiometricHelper.ERROR_USER_CANCELED) {
+                if (errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON || 
+                    errorCode == BiometricPrompt.ERROR_USER_CANCELED) {
                     // User cancelled - keep locked
                     _authState.value = AuthState.LOCKED
                 } else {
@@ -71,7 +73,3 @@ enum class AuthState {
     LOCKED,
     UNLOCKED
 }
-
-// Missing constant from BiometricHelper
-private val BiometricHelper.ERROR_NEGATIVE_BUTTON: Int get() = BiometricPrompt.ERROR_NEGATIVE_BUTTON
-private val BiometricHelper.ERROR_USER_CANCELED: Int get() = BiometricPrompt.ERROR_USER_CANCELED

@@ -23,7 +23,7 @@ import com.example.struku.data.local.entity.ReceiptEntity
     exportSchema = false
 )
 @TypeConverters(Converters::class)
-abbstract class AppDatabase : RoomDatabase() {
+abstract class AppDatabase : RoomDatabase() {
     abstract fun receiptDao(): ReceiptDao
     abstract fun lineItemDao(): LineItemDao
     abstract fun categoryDao(): CategoryDao

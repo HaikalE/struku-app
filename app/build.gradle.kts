@@ -44,6 +44,7 @@ android {
     
     buildFeatures {
         compose = true
+        viewBinding = true  // Add view binding support
     }
     
     composeOptions {
@@ -62,6 +63,10 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.activity:activity-compose:1.8.0")
+    
+    // ConstraintLayout - Added for XML layouts
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.appcompat:appcompat:1.6.1")
     
     // Compose - Gunakan versi BOM yang stabil
     implementation(platform("androidx.compose:compose-bom:2023.08.00"))

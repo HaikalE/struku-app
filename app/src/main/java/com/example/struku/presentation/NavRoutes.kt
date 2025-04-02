@@ -16,6 +16,7 @@ object NavRoutes {
     
     // Scanner related
     const val SCANNER = "scanner"
+    const val RECEIPT_SCAN = "receipt_scan"  // Added missing route
     const val RECEIPT_REVIEW = "receipt_review/{receiptId}"
     
     // Analytics related

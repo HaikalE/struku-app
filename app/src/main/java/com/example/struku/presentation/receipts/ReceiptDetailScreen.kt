@@ -57,7 +57,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiptDetailScreen(
-    receiptId: Int,
+    receiptId: Long,
     navController: NavController,
     viewModel: ReceiptDetailViewModel = hiltViewModel()
 ) {

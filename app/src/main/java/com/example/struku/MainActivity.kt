@@ -6,12 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import com.example.struku.presentation.auth.AuthManager
 import com.example.struku.presentation.auth.AuthState
-import com.example.struku.presentation.auth.AuthenticatedApp
 import com.example.struku.presentation.auth.AuthenticationScreen
 import com.example.struku.presentation.theme.StrukuTheme
-import com.example.struku.util.AuthManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -38,7 +38,9 @@ class MainActivity : ComponentActivity() {
                             AuthenticationScreen { authManager.authenticate(this) }
                         }
                         AuthState.UNLOCKED -> {
-                            AuthenticatedApp()
+                            // Temporary placeholder for authenticated content
+                            // Will be replaced with actual app content
+                            MainContent()
                         }
                     }
                 }

@@ -4,14 +4,44 @@ Aplikasi Android untuk memindai struk belanja, mengekstrak data pengeluaran, dan
 
 ## 📱 Fitur Utama
 
-- Pemindaian struk secara offline dan cepat (<2 detik per struk)
-- Ekstraksi otomatis nama pedagang, tanggal, daftar item, harga, dan total
-- Kategorisasi otomatis pengeluaran menggunakan machine learning
-- Visualisasi data pengeluaran (grafik per kategori, tren bulanan)
-- Deteksi transaksi berulang dan notifikasi anggaran
-- Dukungan multi-mata uang
-- Privasi prioritas - semua data tetap di perangkat pengguna
-- Keamanan lapis ganda dengan enkripsi dan autentikasi biometrik
+- **Pemindaian OCR Offline**: Memindai struk menggunakan kamera dan mengenali teks secara offline dengan ML Kit.
+- **Ekstraksi Data Otomatis**: Mengekstrak nama pedagang, tanggal, daftar item, harga, dan total.
+- **Kategorisasi Otomatis**: Mengkategorikan pengeluaran berdasarkan nama pedagang dan item.
+- **Visualisasi Data**: Melihat grafik dan statistik pengeluaran per kategori dan per bulan.
+- **Anggaran & Pelacakan**: Menetapkan anggaran per kategori dan memantau penggunaan anggaran.
+- **Privasi & Keamanan**: Autentikasi biometrik, data terenkripsi, dan operasi sepenuhnya offline.
+- **Ekspor Data**: Mengekspor data ke CSV untuk analisis lebih lanjut.
+- **Multi-bahasa**: Mendukung bahasa Inggris dan Indonesia.
+
+## 🛠️ Cara Menggunakan
+
+### Pemindaian Struk
+1. Buka aplikasi dan ketuk tombol + untuk memindai struk baru.
+2. Posisikan struk dalam bingkai pemindaian dan ambil foto.
+3. Aplikasi akan memproses struk dan menampilkan hasil untuk ditinjau.
+4. Periksa data yang diekstrak dan lakukan koreksi jika diperlukan.
+5. Tekan tombol Simpan untuk menyimpan struk.
+
+### Pengelolaan Struk
+- **Melihat Daftar Struk**: Buka tab Struk untuk melihat semua struk tersimpan.
+- **Detail Struk**: Ketuk struk untuk melihat detail lengkapnya.
+- **Edit Struk**: Dalam tampilan detail, ketuk tombol Edit untuk memodifikasi data.
+- **Hapus Struk**: Dalam tampilan detail, ketuk tombol Hapus untuk menghapus struk.
+
+### Analitik & Pelacakan
+- **Ringkasan Pengeluaran**: Buka tab Analitik untuk melihat grafik dan visualisasi pengeluaran.
+- **Pemilihan Periode**: Gunakan pemilih bulan untuk melihat data dari bulan yang berbeda.
+- **Breakdown Kategori**: Lihat breakdown pengeluaran berdasarkan kategori dalam bentuk diagram pie.
+- **Status Anggaran**: Cek kemajuan anggaran per kategori jika anggaran telah ditetapkan.
+
+### Ekspor & Berbagi
+- Buka menu Pengaturan, kemudian pilih Ekspor Data.
+- Pilih format ekspor (CSV) dan bagikan file melalui aplikasi lain.
+
+### Keamanan
+- Aplikasi secara default dilindungi dengan autentikasi biometrik.
+- Data disimpan di perangkat secara terenkripsi menggunakan SQLCipher.
+- Tidak ada data yang dikirim ke server - semuanya tetap di perangkat Anda.
 
 ## 🔧 Tech Stack
 
@@ -29,7 +59,7 @@ Aplikasi Android untuk memindai struk belanja, mengekstrak data pengeluaran, dan
 ### UI/UX
 - **Framework UI**: Jetpack Compose
 - **Navigasi**: Compose Navigation
-- **Visualisasi Data**: ComposeCharts atau MPAndroidChart
+- **Visualisasi Data**: Grafik pie dan progress bar dengan Compose
 - **Tema**: Material Design 3 dengan dukungan mode gelap
 - **Aksesibilitas**: Dukungan TalkBack dan font yang dapat disesuaikan
 
@@ -44,7 +74,23 @@ Aplikasi Android untuk memindai struk belanja, mengekstrak data pengeluaran, dan
 - **Privasi**: Pemrosesan data sepenuhnya offline
 - **Export/Import**: Export data terenkripsi dengan password pengguna
 
-## 🏗️ Struktur Proyek
+## 💡 Pengembangan
+
+Proyek menggunakan Gradle dengan Kotlin DSL untuk build system. Untuk menjalankan proyek:
+
+1. Clone repositori ini
+2. Buka dengan Android Studio
+3. Sync Gradle dan build project
+4. Run pada emulator atau perangkat fisik
+
+### Persyaratan
+- Android Studio Hedgehog (2023.1.1) atau lebih baru
+- SDK Android minimum: 24 (Android 7.0)
+- SDK Android target: 34 (Android 14)
+- Gradle 8.2+
+- Kotlin 1.9.22+
+
+## 📊 Struktur Proyek
 
 Aplikasi diorganisir menggunakan arsitektur bersih (Clean Architecture):
 
@@ -61,43 +107,37 @@ app/
 │   │   │   │   ├── model/          # Entitas bisnis (Receipt, LineItem, etc)
 │   │   │   │   ├── repository/     # Antarmuka repositori
 │   │   │   │   └── usecase/        # Kasus penggunaan bisnis
-│   │   │   └── presentation/       # UI, Compose, ViewModels
-│   │   │       ├── scan/           # Pemindaian struk
-│   │   │       ├── list/           # Daftar pengeluaran
-│   │   │       ├── analytics/      # Dashboard & visualisasi
-│   │   │       └── settings/       # Pengaturan aplikasi
+│   │   │   ├── presentation/       # UI, Compose, ViewModels
+│   │   │   │   ├── scan/           # Pemindaian struk
+│   │   │   │   ├── receipts/       # Daftar & detail struk
+│   │   │   │   ├── analytics/      # Dashboard & visualisasi
+│   │   │   │   ├── settings/       # Pengaturan aplikasi
+│   │   │   │   └── auth/           # Autentikasi biometrik
+│   │   │   └── util/               # Utilities & helpers
 │   │   ├── res/                    # Resource UI
 │   │   └── AndroidManifest.xml
 │   ├── test/                       # Unit tests
 │   └── androidTest/                # Instrumented tests
 ```
 
-## 📊 Model Data
+## 🛡️ Privasi & Keamanan
 
-Struktur data utama meliputi:
+Kami memprioritaskan privasi dan keamanan data keuangan Anda:
 
-- **Receipt**: Informasi tentang struk (id, merchantName, date, total, category)
-- **LineItem**: Item individual dalam struk (description, quantity, price)
-- **Category**: Kategori pengeluaran dengan warna untuk visualisasi
-- **Budget**: Anggaran yang ditetapkan pengguna per kategori
-
-## 🚀 Timeline Pengembangan
-
-1. **Fase 1-2**: Riset OCR, prototyping, pengembangan pipeline parsing (Minggu 1-5)
-2. **Fase 3-4**: Implementasi database, UI dasar, dan alur kerja pemindaian (Minggu 6-10)
-3. **Fase 5**: Fitur analitik, kategorisasi, dashboard (Minggu 11-13)
-4. **Fase 6-7**: Penguatan keamanan, pengujian, dan optimasi (Minggu 14-16)
-5. **Fase 8**: Rilis dan pemeliharaan (Minggu 17+)
-
-## 📝 Catatan Privasi
-
-Aplikasi ini didesain dengan privasi dan keamanan sebagai prioritas:
-
-- Tidak memerlukan izin internet - semua pemrosesan terjadi di perangkat
-- Data pribadi dienkripsi menggunakan SQLCipher
-- Tidak ada pengiriman data ke server eksternal
-- Opsional: Ekspor data terenkripsi yang dapat dicadangkan oleh pengguna
+- **Tidak ada izin internet**: Aplikasi tidak memiliki izin internet, sehingga tidak dapat mengirimkan data.
+- **Database terenkripsi**: Semua data disimpan menggunakan SQLCipher dengan enkripsi AES-256.
+- **Perlindungan biometrik**: Akses ke aplikasi dilindungi dengan sidik jari atau PIN perangkat.
+- **FLAG_SECURE**: Mencegah tangkapan layar atau tampilan dalam daftar aplikasi terbaru.
+- **Ekspor terenkripsi opsional**: Pilihan untuk mengenkripsi file ekspor dengan kata sandi.
 
 ## 📄 Lisensi
 
 [MIT License](LICENSE)
+
+## 🤝 Kontribusi
+
+Kontribusi sangat diterima! Lihat [CONTRIBUTING.md](CONTRIBUTING.md) untuk panduan kontribusi.
+
+---
+
+Dibuat dengan ❤️ untuk membantu pengelolaan keuangan pribadi dengan lebih baik sambil menjaga privasi.

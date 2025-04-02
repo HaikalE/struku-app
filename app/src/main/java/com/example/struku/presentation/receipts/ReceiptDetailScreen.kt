@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,8 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,7 +61,7 @@ fun ReceiptDetailScreen(
     navController: NavController,
     viewModel: ReceiptDetailViewModel = hiltViewModel()
 ) {
-    val state by viewModel.state.collectAsState()
+    val uiState by viewModel.state.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
     
     // Load receipt data
@@ -71,7 +70,7 @@ fun ReceiptDetailScreen(
     }
     
     // Handle receipt deletion
-    if (state.isDeleted) {
+    if (uiState.isDeleted) {
         navController.popBackStack()
         return
     }
@@ -117,7 +116,7 @@ fun ReceiptDetailScreen(
                     
                     // Edit button
                     IconButton(onClick = {
-                        navController.navigate(NavRoutes.receiptReview(receiptId))
+                        navController.navigate(NavRoutes.receiptEdit(receiptId))
                     }) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }
@@ -136,10 +135,10 @@ fun ReceiptDetailScreen(
                 .padding(paddingValues)
         ) {
             when {
-                state.isLoading -> {
+                uiState.isLoading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
-                state.receipt == null -> {
+                uiState.receipt == null -> {
                     Text(
                         text = "Tidak dapat memuat data struk",
                         modifier = Modifier
@@ -149,7 +148,11 @@ fun ReceiptDetailScreen(
                     )
                 }
                 else -> {
-                    ReceiptDetailContent(receipt = state.receipt)
+                    // Safe unwrapping of receipt
+                    val receipt = uiState.receipt
+                    if (receipt != null) {
+                        ReceiptDetailContent(receipt = receipt)
+                    }
                 }
             }
         }
@@ -262,7 +265,7 @@ fun ReceiptDetailContent(receipt: Receipt) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = receipt.notes,
+                        text = receipt.notes ?: "",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

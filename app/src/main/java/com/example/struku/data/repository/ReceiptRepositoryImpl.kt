@@ -37,12 +37,12 @@ class ReceiptRepositoryImpl @Inject constructor() : ReceiptRepository {
         }
     }
     
-    override suspend fun deleteReceipt(receiptId: Int) {
-        receipts.removeIf { it.id.toInt() == receiptId }
+    override suspend fun deleteReceipt(receiptId: Long) {
+        receipts.removeIf { it.id == receiptId }
     }
     
-    override suspend fun getReceiptById(receiptId: Int): Receipt? {
-        return receipts.find { it.id.toInt() == receiptId }
+    override suspend fun getReceiptById(receiptId: Long): Receipt? {
+        return receipts.find { it.id == receiptId }
     }
     
     override fun getAllReceipts(): Flow<List<Receipt>> {

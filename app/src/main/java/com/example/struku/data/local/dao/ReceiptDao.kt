@@ -67,14 +67,14 @@ interface ReceiptDao {
         "GROUP BY yearMonth"
     )
     suspend fun getMonthlyTotals(startDate: Date, endDate: Date): List<MonthlyTotal>
-    
-    // Extension function to convert CategoryTotal list to Map if needed
-    fun List<CategoryTotal>.toMap(): Map<String, Double> {
-        return this.associate { it.category to it.total }
-    }
-    
-    // Extension function to convert MonthlyTotal list to Map if needed
-    fun List<MonthlyTotal>.toMap(): Map<String, Double> {
-        return this.associate { it.yearMonth to it.total }
-    }
+}
+
+// Extension function to convert CategoryTotal list to Map - moved outside the interface
+fun List<ReceiptDao.CategoryTotal>.toCategoryMap(): Map<String, Double> {
+    return this.associate { it.category to it.total }
+}
+
+// Extension function to convert MonthlyTotal list to Map - moved outside the interface
+fun List<ReceiptDao.MonthlyTotal>.toMonthlyMap(): Map<String, Double> {
+    return this.associate { it.yearMonth to it.total }
 }

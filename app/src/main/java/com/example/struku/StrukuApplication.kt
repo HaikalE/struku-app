@@ -9,4 +9,9 @@ import dagger.hilt.android.HiltAndroidApp
  * Digunakan untuk inisialisasi dependency injection dengan Hilt.
  */
 @HiltAndroidApp
-class StrukuApplication : Application()
+class StrukuApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        // Initialize any app-wide dependencies here
+    }
+}

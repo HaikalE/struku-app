@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -190,9 +191,8 @@ fun TestImageThumbnail(
         elevation = CardDefaults.cardElevation(
             defaultElevation = if (isSelected) 8.dp else 2.dp
         ),
-        // Fix for type mismatch: using modifier parameter correctly
         border = if (isSelected) {
-            androidx.compose.ui.graphics.BorderStroke(
+            BorderStroke(
                 width = 2.dp,
                 color = MaterialTheme.colorScheme.primary
             )

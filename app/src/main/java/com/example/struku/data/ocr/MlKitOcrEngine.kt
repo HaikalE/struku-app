@@ -6,9 +6,12 @@ import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -16,16 +19,21 @@ import kotlin.coroutines.resumeWithException
 
 /**
  * OCR Engine using ML Kit's text recognition
+ * Optimized with model caching and improved text handling
  */
 @Singleton
 class MlKitOcrEngine @Inject constructor(
-    private val imagePreprocessor: AdvancedImagePreprocessor,
     @ApplicationContext private val context: Context
 ) {
     private val TAG = "MlKitOcrEngine"
     
-    // Create text recognizer
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    // Create text recognizer with singleton instance
+    private val recognizer: TextRecognizer by lazy {
+        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
+    
+    // Cache for recent OCR results to avoid duplicate processing
+    private val resultCache = LruCache<String, String>(5)
     
     /**
      * Recognize text in an image
@@ -33,7 +41,34 @@ class MlKitOcrEngine @Inject constructor(
      * @param bitmap Image to process
      * @return Raw recognized text
      */
-    suspend fun recognizeText(bitmap: Bitmap): String = suspendCancellableCoroutine { continuation ->
+    suspend fun recognizeText(bitmap: Bitmap): String = withContext(Dispatchers.Default) {
+        try {
+            // Generate cache key based on image bitmap hash
+            val cacheKey = bitmap.hashCode().toString()
+            
+            // Check cache first
+            resultCache.get(cacheKey)?.let {
+                Log.d(TAG, "Using cached OCR result")
+                return@withContext it
+            }
+            
+            // Not in cache, process image
+            val result = processImageWithOcr(bitmap)
+            
+            // Cache the result
+            resultCache.put(cacheKey, result)
+            
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during text recognition: ${e.message}", e)
+            throw e
+        }
+    }
+    
+    /**
+     * Process image with OCR
+     */
+    private suspend fun processImageWithOcr(bitmap: Bitmap): String = suspendCancellableCoroutine { continuation ->
         try {
             // Create input image
             val image = InputImage.fromBitmap(bitmap, 0)
@@ -59,16 +94,22 @@ class MlKitOcrEngine @Inject constructor(
     }
     
     /**
-     * Process detected text from ML Kit
+     * Process detected text from ML Kit with improved formatting
      */
     private fun processVisionText(visionText: Text): String {
         val builder = StringBuilder()
         
-        // Process each text block
+        // Process each text block with better formatting
         for (block in visionText.textBlocks) {
+            // Skip very short blocks that might be noise
+            if (block.text.length < 2) continue
+            
             // Process each line
             for (line in block.lines) {
-                builder.append(line.text).append("\n")
+                // Skip very short lines
+                if (line.text.length < 2) continue
+                
+                builder.append(line.text.trim()).append("\n")
             }
             
             // Add extra space between blocks for better readability
@@ -134,6 +175,43 @@ class MlKitOcrEngine @Inject constructor(
                 cornerPoints = block.cornerPoints,
                 lines = lines
             )
+        }
+    }
+    
+    /**
+     * Clear all cached results
+     */
+    fun clearCache() {
+        resultCache.evictAll()
+    }
+}
+
+/**
+ * Simple LRU cache implementation
+ */
+class LruCache<K, V>(private val maxSize: Int) {
+    private val map = LinkedHashMap<K, V>(maxSize, 0.75f, true)
+    
+    @Synchronized
+    fun put(key: K, value: V) {
+        map[key] = value
+        trimCache()
+    }
+    
+    @Synchronized
+    fun get(key: K): V? {
+        return map[key]
+    }
+    
+    @Synchronized
+    fun evictAll() {
+        map.clear()
+    }
+    
+    private fun trimCache() {
+        while (map.size > maxSize) {
+            val firstKey = map.keys.firstOrNull() ?: break
+            map.remove(firstKey)
         }
     }
 }

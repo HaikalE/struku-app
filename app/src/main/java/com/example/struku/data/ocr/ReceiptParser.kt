@@ -1,7 +1,9 @@
 package com.example.struku.data.ocr
 
+import android.util.Log
 import com.example.struku.domain.model.LineItem
 import com.example.struku.domain.model.Receipt
+import com.google.mlkit.vision.text.Text
 import java.text.NumberFormat
 import java.text.ParseException
 import java.text.SimpleDateFormat
@@ -9,298 +11,200 @@ import java.util.Date
 import java.util.Locale
 import java.util.regex.Pattern
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * Parser untuk mengekstrak data terstruktur dari teks struk
+ * Parser for extracting structured information from receipt OCR results
  */
+@Singleton
 class ReceiptParser @Inject constructor() {
-    
-    // Format tanggal yang umum di Indonesia
-    private val dateFormats = listOf(
-        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()),
-        SimpleDateFormat("dd-MM-yyyy", Locale.getDefault()),
-        SimpleDateFormat("dd MMM yyyy", Locale("id")),
-        SimpleDateFormat("d MMM yyyy", Locale("id")),
-        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    )
-    
-    // Format mata uang
-    private val currencyFormats = listOf(
-        NumberFormat.getInstance(Locale("id")),
-        NumberFormat.getInstance(Locale.US)
-    )
+
+    companion object {
+        private const val TAG = "ReceiptParser"
+        
+        // Regular expressions for parsing receipt elements
+        private val DATE_PATTERNS = listOf(
+            Pattern.compile("\\b(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\b"),
+            Pattern.compile("\\b(\\d{1,2}\\s+[A-Za-z]{3,}\\s+\\d{2,4})\\b"),
+            Pattern.compile("\\b(\\d{1,2}\\s+[A-Za-z]{3,})\\b")
+        )
+        
+        private val TOTAL_PATTERNS = listOf(
+            Pattern.compile("(?i)total.*?(?:Rp|IDR)?\\s*(\\d+[.,]\\d{2,3})"),
+            Pattern.compile("(?i)(?:total|jumlah).*?(\\d+[.,]\\d{2,3})"),
+            Pattern.compile("(?i)(?:grand total|total belanja).*?(\\d+[.,]\\d{2,3})"),
+            Pattern.compile("(?i)(?:jumlah bayar).*?(\\d+[.,]\\d{2,3})")
+        )
+        
+        private val MERCHANT_PATTERNS = listOf(
+            Pattern.compile("(?i)^([A-Za-z0-9\\s.]+?)\\s*(?:ltd|inc)?\\s*$", Pattern.MULTILINE),
+            Pattern.compile("(?i)(?:store|toko|market):\\s*([A-Za-z0-9\\s.]+)", Pattern.MULTILINE)
+        )
+        
+        private val ITEM_PATTERN = Pattern.compile("(?i)([A-Za-z0-9\\s.]{5,})\\s+(\\d+)\\s*[xX]\\s*(\\d+[.,]\\d{2,3})\\s*(\\d+[.,]\\d{2,3})")
+    }
     
     /**
-     * Parse teks OCR menjadi objek Receipt
+     * Extract structured receipt data from OCR Text result
+     * @param text OCR result from ML Kit
+     * @return Parsed Receipt object
      */
-    fun parseReceiptText(text: String): Receipt? {
-        if (text.isBlank()) return null
+    fun parseReceipt(text: Text): Receipt {
+        val rawText = text.text
         
-        // Split into lines for analysis
-        val lines = text.split("\n").filter { it.isNotBlank() }
-        if (lines.isEmpty()) return null
+        Log.d(TAG, "Parsing receipt text: $rawText")
         
-        // Extract merchant name (typically in the first few lines)
-        val merchantName = extractMerchantName(lines)
+        // Extract merchant name
+        val merchantName = extractMerchantName(rawText)
         
         // Extract date
-        val date = extractDate(lines) ?: Date()
+        val date = extractDate(rawText)
         
         // Extract total amount
-        val (total, totalLine) = extractTotal(lines)
+        val total = extractTotal(rawText)
         
-        // Extract items (usually lines between merchant name and total)
-        val lineItems = extractLineItems(lines, merchantName, totalLine)
-        
-        // Default category
-        val category = "other"
+        // Extract line items
+        val lineItems = extractLineItems(rawText)
         
         return Receipt(
-            merchantName = merchantName,
-            date = date,
-            total = total,
-            currency = "IDR", // Default to IDR for Indonesia
-            category = category,
+            id = 0, // Will be set on DB insert
+            merchantName = merchantName ?: "Unknown Merchant",
+            date = date?.time ?: System.currentTimeMillis(),
+            total = total ?: 0.0,
+            category = "", // Will be inferred later
+            notes = "",
+            imagePath = null,
             items = lineItems
         )
     }
     
     /**
-     * Extract merchant name from the first few lines
+     * Extract merchant name from receipt text
      */
-    private fun extractMerchantName(lines: List<String>): String {
-        // For simplicity, we'll take the first line as the merchant name
-        // In a real application, you might need more sophisticated logic
-        return if (lines.isNotEmpty()) {
-            lines[0].trim()
-        } else {
-            "Unknown Merchant"
-        }
-    }
-    
-    /**
-     * Extract date from lines
-     */
-    private fun extractDate(lines: List<String>): Date? {
-        val datePatterns = arrayOf(
-            Pattern.compile("\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4}"),  // dd/mm/yyyy or variations
-            Pattern.compile("\\d{1,2}\\s+[A-Za-z]{3,}\\s+\\d{2,4}"),  // dd MMM yyyy
-            Pattern.compile("\\d{4}[/.-]\\d{1,2}[/.-]\\d{1,2}")   // yyyy-mm-dd
-        )
-        
-        for (line in lines) {
-            // Check for date patterns
-            for (pattern in datePatterns) {
-                val matcher = pattern.matcher(line)
-                if (matcher.find()) {
-                    val dateStr = matcher.group()
-                    
-                    // Try parsing with different date formats
-                    for (format in dateFormats) {
-                        try {
-                            return format.parse(dateStr)
-                        } catch (e: ParseException) {
-                            // Try next format
-                        }
-                    }
-                }
-            }
-            
-            // Look for specific date keywords
-            if (line.contains("Tanggal", ignoreCase = true) || 
-                line.contains("Date", ignoreCase = true) ||
-                line.contains("Tgl", ignoreCase = true)) {
-                
-                // Extract part after colon or similar separator
-                val parts = line.split(":", "\\s+").map { it.trim() }
-                if (parts.size > 1) {
-                    for (i in 1 until parts.size) {
-                        for (format in dateFormats) {
-                            try {
-                                return format.parse(parts[i])
-                            } catch (e: ParseException) {
-                                // Try next part or format
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        return null  // Date not found
-    }
-    
-    /**
-     * Extract total amount
-     * @return Pair of (total amount, line index where total was found)
-     */
-    private fun extractTotal(lines: List<String>): Pair<Double, Int> {
-        val totalKeywords = listOf(
-            "total", "jumlah", "grand total", "amount", "total bayar", 
-            "dibayar", "dibayarkan", "payment", "to pay"
-        )
-        
-        // First, look for lines with total keywords
-        for ((index, line) in lines.withIndex().reversed()) {
-            val lowerLine = line.lowercase(Locale.getDefault())
-            
-            if (totalKeywords.any { lowerLine.contains(it) }) {
-                // Extract numbers from this line
-                val amount = extractAmount(line)
-                if (amount > 0) {
-                    return Pair(amount, index)
-                }
-            }
-        }
-        
-        // If no explicit total found, try to find the largest amount in the bottom part of the receipt
-        // (usually the last 30% of lines)
-        val startIndex = (lines.size * 0.7).toInt()
-        var maxAmount = 0.0
-        var maxAmountIndex = -1
-        
-        for (i in startIndex until lines.size) {
-            val amount = extractAmount(lines[i])
-            if (amount > maxAmount) {
-                maxAmount = amount
-                maxAmountIndex = i
-            }
-        }
-        
-        return if (maxAmountIndex >= 0) {
-            Pair(maxAmount, maxAmountIndex)
-        } else {
-            // Fallback: return 0 if no amount found
-            Pair(0.0, lines.size - 1)
-        }
-    }
-    
-    /**
-     * Extract amount from text
-     */
-    private fun extractAmount(text: String): Double {
-        // Remove currency symbols and separators
-        var cleanText = text.replace("[^0-9,.]\\s".toRegex(), " ")
-        
-        // Find patterns that look like money amounts
-        val amountPatterns = arrayOf(
-            // Rp notation with thousands separators
-            Pattern.compile("Rp\\.?\\s*\\d{1,3}(\\.\\d{3})+([,\\.]\\d{1,2})?"),
-            
-            // Numbers with thousands separators
-            Pattern.compile("\\d{1,3}(\\.\\d{3})+([,\\.]\\d{1,2})?"),
-            
-            // Numbers with decimal places
-            Pattern.compile("\\d+[,\\.]\\d{1,2}")
-        )
-        
-        for (pattern in amountPatterns) {
+    private fun extractMerchantName(text: String): String? {
+        for (pattern in MERCHANT_PATTERNS) {
             val matcher = pattern.matcher(text)
             if (matcher.find()) {
-                val amountStr = matcher.group()
-                    .replace("Rp", "")
-                    .replace("Rp.", "")
-                    .trim()
+                return matcher.group(1)?.trim()
+            }
+        }
+        
+        // Fallback: Try to get the first non-empty line as merchant name
+        val lines = text.split("\n")
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.isNotEmpty() && trimmed.length > 3) {
+                return trimmed
+            }
+        }
+        
+        return null
+    }
+    
+    /**
+     * Extract date from receipt text
+     */
+    private fun extractDate(text: String): Date? {
+        // Try different date patterns
+        for (pattern in DATE_PATTERNS) {
+            val matcher = pattern.matcher(text)
+            if (matcher.find()) {
+                val dateStr = matcher.group(1) ?: continue
                 
-                // Try to parse with different formats
-                for (format in currencyFormats) {
+                // Try different date formats
+                val formats = listOf(
+                    "dd/MM/yyyy", "dd-MM-yyyy", "dd/MM/yy", "dd-MM-yy",
+                    "dd MMM yyyy", "dd MMM"
+                )
+                
+                for (format in formats) {
                     try {
-                        return format.parse(amountStr).toDouble()
+                        val dateFormat = SimpleDateFormat(format, Locale.getDefault())
+                        return dateFormat.parse(dateStr)
                     } catch (e: ParseException) {
                         // Try next format
                     }
                 }
-                
-                // If format parsing fails, try manual parsing
-                try {
-                    // Replace thousand separator and fix decimal separator
-                    val normalizedAmount = amountStr
-                        .replace(".", "")
-                        .replace(",", ".")
-                    return normalizedAmount.toDouble()
-                } catch (e: NumberFormatException) {
-                    // Continue to next pattern
-                }
             }
         }
         
-        // If we get here, try to find any number in the text
-        val numberPattern = Pattern.compile("\\d+([,\\.]\\d+)?")
-        val matcher = numberPattern.matcher(text)
-        if (matcher.find()) {
-            try {
-                val amountStr = matcher.group()
-                    .replace(".", "")
-                    .replace(",", ".")
-                return amountStr.toDouble()
-            } catch (e: NumberFormatException) {
-                // Fall through to return 0
-            }
-        }
-        
-        return 0.0  // No valid amount found
+        // If no date found, return current date
+        return Date()
     }
     
     /**
-     * Extract line items from the receipt text
+     * Extract total amount from receipt text
      */
-    private fun extractLineItems(lines: List<String>, merchantName: String, totalLine: Int): List<LineItem> {
-        val items = mutableListOf<LineItem>()
-        
-        // Define the lines that likely contain item entries
-        // Skip the first few lines (usually header) and the last few lines (total, footer)
-        val startLine = 3  // Skip header lines
-        val endLine = if (totalLine > 0) totalLine else lines.size - 3
-        
-        if (startLine >= endLine) return items  // Not enough lines
-        
-        // Extract items from the middle section
-        for (i in startLine until endLine) {
-            val line = lines[i].trim()
-            if (line.isBlank()) continue
-            
-            // Skip lines that are likely not items (e.g., section headers)
-            if (line.length < 5) continue
-            
-            // Pattern 1: Item with quantity and price: "Item Name   2 x 10,000   20,000"
-            val quantityPattern = Pattern.compile("(.+)\\s+(\\d+)\\s*x\\s*([\\d,.]+)\\s+([\\d,.]+)") 
-            var matcher = quantityPattern.matcher(line)
+    private fun extractTotal(text: String): Double? {
+        for (pattern in TOTAL_PATTERNS) {
+            val matcher = pattern.matcher(text)
             if (matcher.find()) {
-                val description = matcher.group(1).trim()
-                val quantity = matcher.group(2).toIntOrNull() ?: 1
-                val unitPrice = extractAmount(matcher.group(3))
-                val price = extractAmount(matcher.group(4))
-                
-                items.add(LineItem(
-                    description = description,
-                    quantity = quantity,
-                    unitPrice = unitPrice,
-                    price = price
-                ))
-                continue
-            }
-            
-            // Pattern 2: Item with just price: "Item Name   10,000"
-            val simplePattern = Pattern.compile("(.+)\\s+([\\d,.]+)$")
-            matcher = simplePattern.matcher(line)
-            if (matcher.find()) {
-                val description = matcher.group(1).trim()
-                val price = extractAmount(matcher.group(2))
-                
-                // Skip if the price is 0 or the description is suspicious
-                if (price > 0 && description.length > 1 && 
-                    !description.equals(merchantName, ignoreCase = true)) {
-                    
-                    items.add(LineItem(
-                        description = description,
-                        quantity = 1,
-                        unitPrice = price,
-                        price = price
-                    ))
+                val amountStr = matcher.group(1)?.replace(",", ".")
+                try {
+                    return amountStr?.toDouble()
+                } catch (e: NumberFormatException) {
+                    // Try next pattern
                 }
+            }
+        }
+        
+        return null
+    }
+    
+    /**
+     * Extract line items from receipt text
+     */
+    private fun extractLineItems(text: String): List<LineItem> {
+        val items = mutableListOf<LineItem>()
+        val matcher = ITEM_PATTERN.matcher(text)
+        
+        while (matcher.find()) {
+            try {
+                val name = matcher.group(1)?.trim() ?: continue
+                val quantity = matcher.group(2)?.toDoubleOrNull() ?: 1.0
+                val price = matcher.group(3)?.replace(",", ".")?.toDoubleOrNull() ?: continue
+                val itemTotal = matcher.group(4)?.replace(",", ".")?.toDoubleOrNull() ?: (price * quantity)
+                
+                items.add(
+                    LineItem(
+                        id = 0, // Will be set on DB insert
+                        receiptId = 0, // Will be set after receipt insert
+                        name = name,
+                        price = price,
+                        quantity = quantity,
+                        total = itemTotal
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing line item: ${e.message}")
             }
         }
         
         return items
+    }
+    
+    /**
+     * Try to infer receipt category from items
+     */
+    fun inferCategory(receipt: Receipt): String {
+        val text = receipt.merchantName.lowercase() + " " + 
+            receipt.items.joinToString(" ") { it.name.lowercase() }
+        
+        return when {
+            containsAny(text, listOf("grocery", "market", "supermarket", "mart", "alfamart", "indomaret", "carefour")) -> "Groceries"
+            containsAny(text, listOf("restaurant", "cafe", "food", "coffee", "meal", "restoran", "kopi", "makanan")) -> "Dining"
+            containsAny(text, listOf("transport", "grab", "gojek", "taxi", "uber", "train", "bus", "mrt", "pesawat", "tiket")) -> "Transportation"
+            containsAny(text, listOf("pharmacy", "drug", "clinic", "hospital", "doctor", "medicine", "apotek", "obat")) -> "Healthcare"
+            containsAny(text, listOf("cloth", "fashion", "apparel", "shoes", "baju", "sepatu", "celana", "pakaian")) -> "Clothing"
+            containsAny(text, listOf("entertainment", "movie", "cinema", "theater", "bioskop", "film")) -> "Entertainment"
+            else -> "Uncategorized"
+        }
+    }
+    
+    /**
+     * Check if text contains any keyword from a list
+     */
+    private fun containsAny(text: String, keywords: List<String>): Boolean {
+        return keywords.any { text.contains(it, ignoreCase = true) }
     }
 }

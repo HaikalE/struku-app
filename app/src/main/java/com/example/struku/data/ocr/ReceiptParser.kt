@@ -1,9 +1,6 @@
 package com.example.struku.data.ocr
 
 import android.util.Log
-import com.example.struku.domain.model.LineItem
-import com.example.struku.domain.model.Receipt
-import com.google.mlkit.vision.text.Text
 import java.text.NumberFormat
 import java.text.ParseException
 import java.text.SimpleDateFormat
@@ -14,113 +11,108 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Parser for extracting structured information from receipt OCR results
+ * Parser for OCR text extracted from receipts
  */
 @Singleton
 class ReceiptParser @Inject constructor() {
-
-    companion object {
-        private const val TAG = "ReceiptParser"
-        
-        // Regular expressions for parsing receipt elements
-        private val DATE_PATTERNS = listOf(
-            Pattern.compile("\\b(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\b"),
-            Pattern.compile("\\b(\\d{1,2}\\s+[A-Za-z]{3,}\\s+\\d{2,4})\\b"),
-            Pattern.compile("\\b(\\d{1,2}\\s+[A-Za-z]{3,})\\b")
-        )
-        
-        private val TOTAL_PATTERNS = listOf(
-            Pattern.compile("(?i)total.*?(?:Rp|IDR)?\\s*(\\d+[.,]\\d{2,3})"),
-            Pattern.compile("(?i)(?:total|jumlah).*?(\\d+[.,]\\d{2,3})"),
-            Pattern.compile("(?i)(?:grand total|total belanja).*?(\\d+[.,]\\d{2,3})"),
-            Pattern.compile("(?i)(?:jumlah bayar).*?(\\d+[.,]\\d{2,3})")
-        )
-        
-        private val MERCHANT_PATTERNS = listOf(
-            Pattern.compile("(?i)^([A-Za-z0-9\\s.]+?)\\s*(?:ltd|inc)?\\s*$", Pattern.MULTILINE),
-            Pattern.compile("(?i)(?:store|toko|market):\\s*([A-Za-z0-9\\s.]+)", Pattern.MULTILINE)
-        )
-        
-        private val ITEM_PATTERN = Pattern.compile("(?i)([A-Za-z0-9\\s.]{5,})\\s+(\\d+)\\s*[xX]\\s*(\\d+[.,]\\d{2,3})\\s*(\\d+[.,]\\d{2,3})")
-    }
+    private val TAG = "ReceiptParser"
     
     /**
-     * Extract structured receipt data from OCR Text result
-     * @param text OCR result from ML Kit
-     * @return Parsed Receipt object
+     * Parse OCR text into structured data
+     * 
+     * @param text Raw OCR text
+     * @return Map of extracted data
      */
-    fun parseReceipt(text: Text): Receipt {
-        val rawText = text.text
+    fun parse(text: String): Map<String, Any> {
+        Log.d(TAG, "Parsing receipt text: ${text.take(100)}...")
         
-        Log.d(TAG, "Parsing receipt text: $rawText")
-        
-        // Extract merchant name
-        val merchantName = extractMerchantName(rawText)
-        
-        // Extract date
-        val date = extractDate(rawText)
-        
-        // Extract total amount
-        val total = extractTotal(rawText)
-        
-        // Extract line items
-        val lineItems = extractLineItems(rawText)
-        
-        return Receipt(
-            id = 0, // Will be set on DB insert
-            merchantName = merchantName ?: "Unknown Merchant",
-            date = date?.time ?: System.currentTimeMillis(),
-            total = total ?: 0.0,
-            category = "", // Will be inferred later
-            notes = "",
-            imagePath = null,
-            items = lineItems
-        )
+        return try {
+            // Extract key information
+            val merchantName = extractMerchantName(text)
+            val date = extractDate(text)
+            val total = extractTotal(text)
+            val items = extractLineItems(text)
+            val currency = extractCurrency(text)
+            
+            // Build result map
+            val result = mutableMapOf<String, Any>()
+            result["merchantName"] = merchantName
+            result["date"] = date
+            result["total"] = total
+            result["items"] = items
+            result["currency"] = currency
+            
+            // Additional data
+            val notes = extractNotes(text)
+            if (notes.isNotEmpty()) {
+                result["notes"] = notes
+            }
+            
+            val category = categorizeReceipt(merchantName, text)
+            if (category.isNotEmpty()) {
+                result["category"] = category
+            }
+            
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing receipt text: ${e.message}", e)
+            mapOf(
+                "error" to "Failed to parse receipt",
+                "errorMessage" to (e.message ?: "Unknown error")
+            )
+        }
     }
     
     /**
      * Extract merchant name from receipt text
      */
-    private fun extractMerchantName(text: String): String? {
-        for (pattern in MERCHANT_PATTERNS) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                return matcher.group(1)?.trim()
-            }
+    private fun extractMerchantName(text: String): String {
+        // Start with first few lines, merchant name is usually at the top
+        val lines = text.split("\n").take(5)
+        
+        // Try to find the most prominent line
+        val candidateLines = lines.filter { 
+            it.length > 3 && 
+            !it.contains("RECEIPT") && 
+            !it.contains("INVOICE") && 
+            !it.matches(Regex(".*(\\d{2}/\\d{2}/\\d{2,4}).*")) 
         }
         
-        // Fallback: Try to get the first non-empty line as merchant name
-        val lines = text.split("\n")
-        for (line in lines) {
-            val trimmed = line.trim()
-            if (trimmed.isNotEmpty() && trimmed.length > 3) {
-                return trimmed
-            }
-        }
-        
-        return null
+        // Return the first good candidate or a default value
+        return candidateLines.firstOrNull()?.trim() ?: "Unknown Merchant"
     }
     
     /**
      * Extract date from receipt text
      */
-    private fun extractDate(text: String): Date? {
-        // Try different date patterns
-        for (pattern in DATE_PATTERNS) {
+    private fun extractDate(text: String): Date {
+        // Look for common date formats
+        val datePatterns = listOf(
+            // DD/MM/YYYY
+            Pattern.compile("(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})"),
+            // YYYY/MM/DD
+            Pattern.compile("(\\d{4}[/.-]\\d{1,2}[/.-]\\d{1,2})"),
+            // Text representations
+            Pattern.compile("(\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{2,4})", Pattern.CASE_INSENSITIVE)
+        )
+        
+        // Try each pattern
+        for (pattern in datePatterns) {
             val matcher = pattern.matcher(text)
             if (matcher.find()) {
-                val dateStr = matcher.group(1) ?: continue
+                val dateStr = matcher.group(1)
                 
                 // Try different date formats
-                val formats = listOf(
-                    "dd/MM/yyyy", "dd-MM-yyyy", "dd/MM/yy", "dd-MM-yy",
-                    "dd MMM yyyy", "dd MMM"
+                val dateFormats = listOf(
+                    "dd/MM/yyyy", "d/M/yyyy", "yyyy/MM/dd",
+                    "dd-MM-yyyy", "yyyy-MM-dd",
+                    "dd MMM yyyy", "d MMM yyyy"
                 )
                 
-                for (format in formats) {
+                for (format in dateFormats) {
                     try {
-                        val dateFormat = SimpleDateFormat(format, Locale.getDefault())
-                        return dateFormat.parse(dateStr)
+                        val sdf = SimpleDateFormat(format, Locale.getDefault())
+                        return sdf.parse(dateStr) ?: Date()
                     } catch (e: ParseException) {
                         // Try next format
                     }
@@ -135,48 +127,81 @@ class ReceiptParser @Inject constructor() {
     /**
      * Extract total amount from receipt text
      */
-    private fun extractTotal(text: String): Double? {
-        for (pattern in TOTAL_PATTERNS) {
+    private fun extractTotal(text: String): Double {
+        // Common patterns for total amount
+        val totalPatterns = listOf(
+            Pattern.compile("(?i)total\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)amount\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)grand total\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)sum\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)to pay\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})")
+        )
+        
+        // Try each pattern
+        for (pattern in totalPatterns) {
             val matcher = pattern.matcher(text)
             if (matcher.find()) {
-                val amountStr = matcher.group(1)?.replace(",", ".")
+                val totalStr = matcher.group(1)
+                    .replace("$", "")
+                    .replace(",", "")
+                    .replace(" ", "")
+                
                 try {
-                    return amountStr?.toDouble()
+                    return totalStr.toDouble()
                 } catch (e: NumberFormatException) {
                     // Try next pattern
                 }
             }
         }
         
-        return null
+        // If no specific total found, look for last price in the receipt
+        val pricePattern = Pattern.compile("(\\d+[,\\d]*\\.\\d{2})")
+        val matcher = pricePattern.matcher(text)
+        var lastPrice = 0.0
+        
+        while (matcher.find()) {
+            try {
+                val priceStr = matcher.group(1).replace(",", "")
+                val price = priceStr.toDouble()
+                lastPrice = price
+            } catch (e: NumberFormatException) {
+                // Skip invalid prices
+            }
+        }
+        
+        return lastPrice
     }
     
     /**
      * Extract line items from receipt text
      */
-    private fun extractLineItems(text: String): List<LineItem> {
-        val items = mutableListOf<LineItem>()
-        val matcher = ITEM_PATTERN.matcher(text)
+    private fun extractLineItems(text: String): List<Map<String, Any>> {
+        val items = mutableListOf<Map<String, Any>>()
+        val lines = text.split("\n")
         
-        while (matcher.find()) {
-            try {
-                val name = matcher.group(1)?.trim() ?: continue
-                val quantity = matcher.group(2)?.toDoubleOrNull() ?: 1.0
-                val price = matcher.group(3)?.replace(",", ".")?.toDoubleOrNull() ?: continue
-                val itemTotal = matcher.group(4)?.replace(",", ".")?.toDoubleOrNull() ?: (price * quantity)
-                
-                items.add(
-                    LineItem(
-                        id = 0, // Will be set on DB insert
-                        receiptId = 0, // Will be set after receipt insert
-                        name = name,
-                        price = price,
-                        quantity = quantity,
-                        total = itemTotal
-                    )
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Error parsing line item: ${e.message}")
+        // Simple item pattern: item name followed by price
+        val itemPattern = Pattern.compile("(.+?)\\s+(\\d+(?:\\.\\d{2})?)\\s*$")
+        
+        for (line in lines) {
+            val matcher = itemPattern.matcher(line)
+            if (matcher.find()) {
+                try {
+                    val name = matcher.group(1).trim()
+                    val price = matcher.group(2).toDouble()
+                    
+                    // Skip very short item names or suspiciously high prices
+                    if (name.length > 2 && price > 0 && price < 10000) {
+                        val item = mapOf(
+                            "name" to name,
+                            "price" to price,
+                            "quantity" to 1.0,
+                            "total" to price
+                        )
+                        items.add(item)
+                    }
+                } catch (e: Exception) {
+                    // Skip this line if parsing fails
+                }
             }
         }
         
@@ -184,27 +209,76 @@ class ReceiptParser @Inject constructor() {
     }
     
     /**
-     * Try to infer receipt category from items
+     * Extract currency from receipt text
      */
-    fun inferCategory(receipt: Receipt): String {
-        val text = receipt.merchantName.lowercase() + " " + 
-            receipt.items.joinToString(" ") { it.name.lowercase() }
+    private fun extractCurrency(text: String): String {
+        // Look for currency symbols or codes
+        val currencyPatterns = mapOf(
+            Pattern.compile("\\$") to "USD",
+            Pattern.compile("€") to "EUR",
+            Pattern.compile("£") to "GBP",
+            Pattern.compile("¥") to "JPY",
+            Pattern.compile("USD") to "USD",
+            Pattern.compile("EUR") to "EUR",
+            Pattern.compile("IDR") to "IDR",
+            Pattern.compile("Rp") to "IDR"
+        )
         
-        return when {
-            containsAny(text, listOf("grocery", "market", "supermarket", "mart", "alfamart", "indomaret", "carefour")) -> "Groceries"
-            containsAny(text, listOf("restaurant", "cafe", "food", "coffee", "meal", "restoran", "kopi", "makanan")) -> "Dining"
-            containsAny(text, listOf("transport", "grab", "gojek", "taxi", "uber", "train", "bus", "mrt", "pesawat", "tiket")) -> "Transportation"
-            containsAny(text, listOf("pharmacy", "drug", "clinic", "hospital", "doctor", "medicine", "apotek", "obat")) -> "Healthcare"
-            containsAny(text, listOf("cloth", "fashion", "apparel", "shoes", "baju", "sepatu", "celana", "pakaian")) -> "Clothing"
-            containsAny(text, listOf("entertainment", "movie", "cinema", "theater", "bioskop", "film")) -> "Entertainment"
-            else -> "Uncategorized"
+        for ((pattern, currency) in currencyPatterns) {
+            if (pattern.matcher(text).find()) {
+                return currency
+            }
         }
+        
+        // Default to IDR for Indonesian receipts
+        return "IDR"
     }
     
     /**
-     * Check if text contains any keyword from a list
+     * Extract additional notes from receipt text
      */
-    private fun containsAny(text: String, keywords: List<String>): Boolean {
-        return keywords.any { text.contains(it, ignoreCase = true) }
+    private fun extractNotes(text: String): String {
+        // Look for special notes, comments, or additional information
+        val notesPatterns = listOf(
+            Pattern.compile("(?i)note\\s*:(.+)"),
+            Pattern.compile("(?i)comment\\s*:(.+)"),
+            Pattern.compile("(?i)special instruction\\s*:(.+)")
+        )
+        
+        for (pattern in notesPatterns) {
+            val matcher = pattern.matcher(text)
+            if (matcher.find()) {
+                return matcher.group(1).trim()
+            }
+        }
+        
+        return ""
+    }
+    
+    /**
+     * Categorize receipt based on merchant name and text
+     */
+    private fun categorizeReceipt(merchantName: String, text: String): String {
+        // Simple categorization based on keywords
+        val categories = mapOf(
+            listOf("restaurant", "cafe", "coffee", "resto", "food", "bakery", "pizza", "burger") to "Food & Dining",
+            listOf("market", "supermarket", "grocery", "mart", "minimarket") to "Groceries",
+            listOf("transport", "taxi", "uber", "grab", "gojek", "train", "bus", "mrt") to "Transportation",
+            listOf("pharmacy", "drug", "apotik", "clinic", "hospital", "doctor") to "Healthcare",
+            listOf("mall", "shop", "store", "retail", "boutique", "clothing") to "Shopping",
+            listOf("cinema", "movie", "theater", "entertainment", "concert") to "Entertainment",
+            listOf("hotel", "motel", "airbnb", "accommodation", "hostel", "resort") to "Travel",
+            listOf("bill", "utility", "electric", "water", "gas", "internet", "phone") to "Bills & Utilities"
+        )
+        
+        val lcText = (merchantName + " " + text).toLowerCase()
+        
+        for ((keywords, category) in categories) {
+            if (keywords.any { lcText.contains(it) }) {
+                return category
+            }
+        }
+        
+        return "Uncategorized"
     }
 }

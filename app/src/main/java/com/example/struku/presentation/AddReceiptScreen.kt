@@ -72,14 +72,15 @@ fun AddReceiptScreen(
                         // Save receipt
                         if (merchantName.isNotBlank() && totalAmount.isNotBlank()) {
                             val amount = totalAmount.toDoubleOrNull() ?: 0.0
+                            val parsedDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(date) ?: Date()
                             val receipt = Receipt(
                                 id = 0, // Auto-generated
                                 merchantName = merchantName,
-                                date = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(date)?.time ?: System.currentTimeMillis(),
+                                date = parsedDate,
                                 total = amount,
                                 category = category,
                                 notes = notes,
-                                imagePath = null,
+                                imageUri = null,
                                 items = emptyList()
                             )
                             
@@ -161,14 +162,15 @@ fun AddReceiptScreen(
                     // Save receipt
                     if (merchantName.isNotBlank() && totalAmount.isNotBlank()) {
                         val amount = totalAmount.toDoubleOrNull() ?: 0.0
+                        val parsedDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(date) ?: Date()
                         val receipt = Receipt(
                             id = 0, // Auto-generated
                             merchantName = merchantName,
-                            date = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(date)?.time ?: System.currentTimeMillis(),
+                            date = parsedDate,
                             total = amount,
                             category = category,
                             notes = notes,
-                            imagePath = null,
+                            imageUri = null,
                             items = emptyList()
                         )
                         

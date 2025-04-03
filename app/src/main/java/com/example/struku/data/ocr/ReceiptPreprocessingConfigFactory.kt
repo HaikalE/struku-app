@@ -1,135 +1,111 @@
 package com.example.struku.data.ocr
 
 /**
- * Factory for creating preprocessing configurations
+ * Factory for creating preprocessing configurations for receipt images
  */
 object ReceiptPreprocessingConfigFactory {
-    
     /**
-     * Create a configuration with specified parameters
+     * Create a default configuration for receipt preprocessing
      */
-    fun createConfig(
-        receiptType: ReceiptType = ReceiptType.AUTO_DETECT,
-        preprocessingLevel: PreprocessingLevel = PreprocessingLevel.ADVANCED,
-        enabled: Boolean = true
-    ): ReceiptPreprocessingConfig {
+    fun createConfig(): ReceiptPreprocessingConfig {
         return ReceiptPreprocessingConfig(
-            receiptType = receiptType,
-            preprocessingLevel = preprocessingLevel,
-            enabled = enabled
+            // Increase contrast to make text more visible
+            contrastAdjustment = 1.5f,
+            
+            // Apply gaussian blur to reduce noise
+            gaussianBlurRadius = 0.5f,
+            
+            // Apply adaptive thresholding to better isolate text
+            // Enhanced to better handle dark text on light background
+            adaptiveThresholdBlockSize = 31,
+            adaptiveThresholdConstant = 11.0,
+            
+            // Resize image to optimal size for OCR
+            resizeMaxDimension = 2000,
+            
+            // Enhanced deskewing - better handle rotated receipts
+            performDeskew = true,
+            
+            // Sharpen image to make text clearer
+            performSharpen = true,
+            sharpenAmount = 1.2f,
+            
+            // Use grayscale for better results
+            convertToGrayscale = true,
+            
+            // Detect and crop receipt from background
+            detectAndCropReceipt = true,
+            
+            // Image normalization and additional settings
+            performNormalization = true,
+            
+            // Apply specific optimizations for receipts
+            // Improved whitespace handling and edge detection
+            optimizeForReceipts = true,
+            
+            // Processing level - higher level means more processing
+            // Use ENHANCED for better results with struk format
+            processingLevel = PreprocessingLevel.ENHANCED
         )
     }
     
     /**
-     * Create a basic config with minimal preprocessing
+     * Create a configuration optimized for low-light or blurry images
      */
-    fun createBasicConfig(): ReceiptPreprocessingConfig {
+    fun createLowLightConfig(): ReceiptPreprocessingConfig {
         return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.AUTO_DETECT,
-            preprocessingLevel = PreprocessingLevel.BASIC,
-            enabled = true
+            contrastAdjustment = 1.8f,
+            brightnessAdjustment = 20f,
+            gaussianBlurRadius = 0.8f,
+            adaptiveThresholdBlockSize = 35,
+            adaptiveThresholdConstant = 15.0,
+            resizeMaxDimension = 2000,
+            performDeskew = true,
+            performSharpen = true,
+            sharpenAmount = 1.5f,
+            convertToGrayscale = true,
+            detectAndCropReceipt = true,
+            performNormalization = true,
+            optimizeForReceipts = true,
+            processingLevel = PreprocessingLevel.INTENSIVE
         )
     }
     
     /**
-     * Create an advanced config with medium preprocessing
+     * Create a configuration optimized specifically for US style receipts
+     * with standard column-based formats
      */
-    fun createAdvancedConfig(): ReceiptPreprocessingConfig {
+    fun createWesternReceiptConfig(): ReceiptPreprocessingConfig {
         return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.AUTO_DETECT,
-            preprocessingLevel = PreprocessingLevel.ADVANCED,
-            enabled = true
+            contrastAdjustment = 1.4f,
+            brightnessAdjustment = 10f,
+            gaussianBlurRadius = 0.5f,
+            adaptiveThresholdBlockSize = 25,
+            adaptiveThresholdConstant = 10.0,
+            resizeMaxDimension = 2000,
+            performDeskew = true,
+            performSharpen = true,
+            sharpenAmount = 1.2f,
+            convertToGrayscale = true,
+            detectAndCropReceipt = true,
+            performNormalization = true,
+            optimizeForReceipts = true,
+            // Uses specific optimizations for columnar receipts
+            processingLevel = PreprocessingLevel.ENHANCED,
+            optimizeForWesternReceipts = true
         )
     }
     
     /**
-     * Create a maximum config with full preprocessing
+     * Create a specific configuration for dealing with dollar signs and western formats
+     * in receipts 
      */
-    fun createMaxConfig(): ReceiptPreprocessingConfig {
-        return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.AUTO_DETECT,
-            preprocessingLevel = PreprocessingLevel.MAXIMUM,
-            enabled = true
-        )
-    }
-    
-    /**
-     * Create a speed-optimized configuration
-     * Uses minimal preprocessing for faster processing
-     */
-    fun createSpeedOptimizedConfig(): ReceiptPreprocessingConfig {
-        return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.AUTO_DETECT,
-            preprocessingLevel = PreprocessingLevel.BASIC,
-            enabled = true
-        )
-    }
-    
-    /**
-     * Create a quality-optimized configuration
-     * Uses maximum preprocessing for best OCR results
-     */
-    fun createQualityOptimizedConfig(): ReceiptPreprocessingConfig {
-        return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.AUTO_DETECT,
-            preprocessingLevel = PreprocessingLevel.MAXIMUM,
-            enabled = true
-        )
-    }
-    
-    /**
-     * Create a balanced configuration (default)
-     * Uses advanced preprocessing with auto-detection
-     */
-    fun createBalancedConfig(): ReceiptPreprocessingConfig {
-        return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.AUTO_DETECT,
-            preprocessingLevel = PreprocessingLevel.ADVANCED,
-            enabled = true
-        )
-    }
-    
-    /**
-     * Create a configuration optimized for thermal receipts
-     */
-    fun createThermalReceiptConfig(): ReceiptPreprocessingConfig {
-        return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.THERMAL,
-            preprocessingLevel = PreprocessingLevel.ADVANCED,
-            enabled = true
-        )
-    }
-    
-    /**
-     * Create a configuration optimized for inkjet/printed receipts
-     */
-    fun createInkjetReceiptConfig(): ReceiptPreprocessingConfig {
-        return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.INKJET,
-            preprocessingLevel = PreprocessingLevel.ADVANCED,
-            enabled = true
-        )
-    }
-    
-    /**
-     * Create a configuration optimized for laser-printed receipts
-     */
-    fun createLaserReceiptConfig(): ReceiptPreprocessingConfig {
-        return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.LASER,
-            preprocessingLevel = PreprocessingLevel.ADVANCED,
-            enabled = true
-        )
-    }
-    
-    /**
-     * Create a configuration optimized for digital receipts
-     */
-    fun createDigitalReceiptConfig(): ReceiptPreprocessingConfig {
-        return ReceiptPreprocessingConfig(
-            receiptType = ReceiptType.DIGITAL,
-            preprocessingLevel = PreprocessingLevel.ADVANCED,
-            enabled = true
+    fun createDollarFormatConfig(): ReceiptPreprocessingConfig {
+        return createWesternReceiptConfig().copy(
+            // Enhanced processing for currencies and symbols
+            enhancedCurrencyDetection = true,
+            // Apply additional contrast to make currency symbols clear
+            contrastAdjustment = 1.6f
         )
     }
 }

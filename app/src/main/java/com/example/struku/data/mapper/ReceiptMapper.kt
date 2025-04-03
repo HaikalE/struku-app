@@ -24,11 +24,11 @@ class ReceiptMapper @Inject constructor() {
             merchantName = receipt.merchantName,
             date = receipt.date,
             total = receipt.total,
-            currency = receipt.currency ?: "IDR",
+            currency = receipt.currency,
             category = receipt.category,
             imageUri = receipt.imageUri,
-            notes = receipt.notes,
-            createdAt = receipt.createdAt ?: Date(),
+            notes = receipt.notes.takeIf { it.isNotBlank() },
+            createdAt = receipt.createdAt,
             updatedAt = Date() // Always use current time for updates
         )
     }
@@ -83,7 +83,7 @@ class ReceiptMapper @Inject constructor() {
             quantity = lineItem.quantity,
             total = lineItem.price * lineItem.quantity,
             category = lineItem.category,
-            notes = lineItem.notes
+            notes = lineItem.notes.takeIf { it.isNotBlank() }
         )
     }
 

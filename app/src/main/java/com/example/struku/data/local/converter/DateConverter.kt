@@ -20,6 +20,6 @@ class DateConverter {
      */
     @TypeConverter
     fun toDate(timestamp: Long?): Date? {
-        return timestamp?.let { Date(it) }
+        return if (timestamp != null && timestamp > 0) Date(timestamp) else null
     }
 }

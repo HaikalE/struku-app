@@ -1,5 +1,6 @@
 package com.example.struku.di
 
+import android.content.Context
 import com.example.struku.data.local.dao.ReceiptDao
 import com.example.struku.data.mapper.ReceiptMapper
 import com.example.struku.data.ocr.AdvancedImagePreprocessor
@@ -12,6 +13,7 @@ import com.example.struku.domain.repository.ReceiptRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -40,11 +42,12 @@ object RepositoryModule {
     @Provides
     @Singleton
     fun provideOcrRepository(
+        @ApplicationContext context: Context,
         ocrEngine: MlKitOcrEngine,
         imagePreprocessor: AdvancedImagePreprocessor,
         receiptParser: ReceiptParser
     ): OcrRepository {
-        return OcrRepositoryImpl(ocrEngine, imagePreprocessor, receiptParser)
+        return OcrRepositoryImpl(context, ocrEngine, imagePreprocessor, receiptParser)
     }
     
     /**

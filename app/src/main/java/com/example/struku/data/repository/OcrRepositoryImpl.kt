@@ -12,6 +12,7 @@ import com.example.struku.data.ocr.MlKitOcrEngine
 import com.example.struku.data.ocr.ReceiptParser
 import com.example.struku.data.ocr.ReceiptPreprocessingConfig
 import com.example.struku.data.ocr.ReceiptPreprocessingConfigFactory
+import com.example.struku.domain.model.LineItem
 import com.example.struku.domain.model.Receipt
 import com.example.struku.domain.repository.OcrRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,7 +20,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -107,10 +107,32 @@ class OcrRepositoryImpl @Inject constructor(
                 // Process the receipt
                 val extractedData = processReceipt(bitmap)
                 
+                // Handle possible errors
+                if (extractedData.containsKey("error")) {
+                    Log.e(TAG, "Error in extracted data: ${extractedData["error"]}")
+                    return@withContext null
+                }
+                
                 // Convert the extracted data to a Receipt object
                 val merchantName = extractedData["merchantName"] as? String ?: "Unknown Merchant"
                 val total = extractedData["total"] as? Double ?: 0.0
                 val date = extractedData["date"] as? Date ?: Date()
+                val items = extractedData["items"] as? List<Map<String, Any>> ?: emptyList()
+                
+                // Convert line items
+                val lineItems = items.mapNotNull { itemMap ->
+                    val name = itemMap["name"] as? String ?: return@mapNotNull null
+                    val price = itemMap["price"] as? Double ?: 0.0
+                    val quantity = itemMap["quantity"] as? Double ?: 1.0
+                    val category = itemMap["category"] as? String ?: ""
+                    
+                    LineItem(
+                        name = name,
+                        price = price,
+                        quantity = quantity,
+                        category = category
+                    )
+                }
                 
                 // Create and return a Receipt object
                 Receipt(
@@ -118,7 +140,7 @@ class OcrRepositoryImpl @Inject constructor(
                     total = total,
                     date = date,
                     imageUri = null,
-                    items = emptyList(),
+                    items = lineItems,
                     category = extractedData["category"] as? String ?: ""
                 )
             } catch (e: Exception) {

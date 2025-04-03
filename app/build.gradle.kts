@@ -55,6 +55,7 @@ android {
     buildFeatures {
         compose = true
         viewBinding = true
+        prefab = true  // Properly configured prefab feature
     }
     
     composeOptions {

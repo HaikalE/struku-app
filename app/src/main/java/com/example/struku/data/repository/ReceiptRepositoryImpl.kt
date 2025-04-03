@@ -137,4 +137,8 @@ class ReceiptRepositoryImpl @Inject constructor(
             monthTotals.associate { it.monthName to it.monthTotal }
         }
     }
+    
+    override suspend fun saveReceipt(receipt: Receipt): Long {
+        return insertReceipt(receipt)
+    }
 }

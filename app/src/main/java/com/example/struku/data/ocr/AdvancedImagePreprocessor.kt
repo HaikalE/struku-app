@@ -63,7 +63,7 @@ class AdvancedImagePreprocessor @Inject constructor(
             // Apply processing based on level (optimized versions)
             processedImage = when (config.preprocessingLevel) {
                 PreprocessingLevel.BASIC -> {
-                    applyOptimizedBasicPreprocessing(processedImage, config)
+                    applyOptimizedBasicPreprocessing(processedImage)
                 }
                 PreprocessingLevel.ADVANCED -> {
                     applyOptimizedAdvancedPreprocessing(processedImage, config)
@@ -129,7 +129,7 @@ class AdvancedImagePreprocessor @Inject constructor(
     /**
      * Apply optimized basic preprocessing (grayscale, contrast)
      */
-    private fun applyOptimizedBasicPreprocessing(bitmap: Bitmap, config: ReceiptPreprocessingConfig): Bitmap {
+    private fun applyOptimizedBasicPreprocessing(bitmap: Bitmap): Bitmap {
         // Convert to grayscale (optimized)
         val grayscaleBitmap = toGrayscaleFast(bitmap)
         visualizer.captureProcessingStep(
@@ -154,7 +154,7 @@ class AdvancedImagePreprocessor @Inject constructor(
      */
     private fun applyOptimizedAdvancedPreprocessing(bitmap: Bitmap, config: ReceiptPreprocessingConfig): Bitmap {
         // First apply basic preprocessing
-        var processedImage = applyOptimizedBasicPreprocessing(bitmap, config)
+        var processedImage = applyOptimizedBasicPreprocessing(bitmap)
         
         // Apply a faster noise reduction (using optimized algorithm)
         processedImage = applyOptimizedNoiseReduction(processedImage)
@@ -361,8 +361,7 @@ class AdvancedImagePreprocessor @Inject constructor(
         val resultPixels = IntArray(width * height)
         
         // For large images, use a more aggressive downsampling
-        val skipFactor = if (width * height >
-                800000) 4 else 2
+        val skipFactor = if (width * height > 800000) 4 else 2
         
         // Process image with skipping
         val radius = blockSize / 2

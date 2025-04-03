@@ -1,10 +1,8 @@
 package com.example.struku.presentation.debug
 
 import android.content.Context
-import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,26 +10,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,18 +42,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.IOException
-import java.io.InputStream
 
 /**
- * Component for selecting test images for preprocessing
+ * Component for selecting test images
  */
 @Composable
 fun TestImageSelector(
@@ -64,9 +64,11 @@ fun TestImageSelector(
     var testImages by remember { mutableStateOf<List<TestImage>>(emptyList()) }
     var selectedImage by remember { mutableStateOf<TestImage?>(null) }
     
-    // Load test images from assets
+    // Load test images
     LaunchedEffect(Unit) {
-        testImages = loadTestImages(context)
+        testImages = withContext(Dispatchers.IO) {
+            loadTestImages(context)
+        }
     }
     
     Column(
@@ -77,96 +79,112 @@ fun TestImageSelector(
         Text(
             "Test Images",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            modifier = Modifier.padding(bottom = 8.dp)
         )
         
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "Select an image to test preprocessing and OCR",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
         
+        // Test image grid
         if (testImages.isEmpty()) {
-            // Display loading or empty state
-            Box(
+            Text(
+                "No test images available",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(8.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Loading test images...")
-            }
+                    .padding(vertical = 32.dp),
+                textAlign = TextAlign.Center,
+                color = Color.Gray
+            )
         } else {
-            // Display image selection
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                contentPadding = PaddingValues(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.height(220.dp) // Fixed height
             ) {
                 items(testImages) { image ->
-                    TestImageThumbnail(
+                    TestImageItem(
                         image = image,
-                        isSelected = image == selectedImage,
-                        onClick = { 
-                            selectedImage = image
-                            onImageSelected(image.bitmap)
-                        }
+                        isSelected = selectedImage == image,
+                        onClick = { selectedImage = image }
                     )
                 }
             }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Selected image preview with actions
-        selectedImage?.let { selected ->
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth()
+        // Selected image actions
+        selectedImage?.let { image ->
+            Divider(modifier = Modifier.padding(vertical = 16.dp))
+            
+            // Selected image preview
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Image preview
+                Card(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    elevation = CardDefaults.cardElevation(4.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Image(
+                            bitmap = image.bitmap.asImageBitmap(),
+                            contentDescription = image.name,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                // Image details and actions
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        "Selected: ${selected.name}",
-                        style = MaterialTheme.typography.titleSmall
+                        image.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
                     )
                     
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     
-                    // Image preview
-                    Image(
-                        bitmap = selected.bitmap.asImageBitmap(),
-                        contentDescription = selected.name,
-                        modifier = Modifier
-                            .fillMaxWidth(0.7f)
-                            .aspectRatio(selected.bitmap.width.toFloat() / selected.bitmap.height),
-                        contentScale = ContentScale.Fit
+                    Text(
+                        "${image.bitmap.width} x ${image.bitmap.height}",
+                        style = MaterialTheme.typography.bodyMedium
                     )
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // Process button
+                    // Action buttons
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = { 
-                                onImageSelected(selected.bitmap)
-                            }
+                            onClick = { onImageSelected(image.bitmap) },
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Default.BugReport, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text("Process")
                         }
                         
                         Button(
-                            onClick = {
-                                onProcessComparisons(selected.bitmap)
-                            }
+                            onClick = { onProcessComparisons(image.bitmap) },
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Default.Image, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Compare Settings")
+                            Icon(Icons.Default.CompareArrows, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Compare")
                         }
                     }
                 }
@@ -175,60 +193,54 @@ fun TestImageSelector(
     }
 }
 
-/**
- * Thumbnail for a test image
- */
 @Composable
-fun TestImageThumbnail(
+fun TestImageItem(
     image: TestImage,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
-            .width(120.dp)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) 8.dp else 2.dp
-        ),
-        border = if (isSelected) {
-            BorderStroke(
-                width = 2.dp,
-                color = MaterialTheme.colorScheme.primary
-            )
-        } else {
-            null
-        }
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .clickable(onClick = onClick)
+            .border(
+                width = if (isSelected) 2.dp else 0.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            ),
+        elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(8.dp)
-        ) {
-            // Image preview
-            Image(
-                bitmap = image.bitmap.asImageBitmap(),
-                contentDescription = image.name,
+        Column {
+            Box(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(4.dp)),
-                contentScale = ContentScale.Crop
-            )
+            ) {
+                Image(
+                    bitmap = image.bitmap.asImageBitmap(),
+                    contentDescription = image.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            // Image name
             Text(
                 text = image.name,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 1
+                maxLines = 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(4.dp),
+                textAlign = TextAlign.Center
             )
         }
     }
 }
 
 /**
- * Data class for a test image
+ * Model for test images
  */
 data class TestImage(
     val name: String,
@@ -238,61 +250,32 @@ data class TestImage(
 /**
  * Load test images from assets
  */
-private suspend fun loadTestImages(context: Context): List<TestImage> = withContext(Dispatchers.IO) {
-    val images = mutableListOf<TestImage>()
-    val assetManager = context.assets
-    
-    try {
-        // Try to load from receipts folder
-        val imageFiles = assetManager.list("receipts") ?: emptyArray()
+private fun loadTestImages(context: Context): List<TestImage> {
+    return try {
+        val assetManager = context.assets
+        val testImageFiles = assetManager.list("test_receipts") ?: return emptyList()
         
-        for (file in imageFiles) {
-            if (file.endsWith(".jpg") || file.endsWith(".png") || file.endsWith(".jpeg")) {
-                val bitmap = loadBitmapFromAssets(assetManager, "receipts/$file")
-                bitmap?.let {
-                    images.add(TestImage(file, it))
-                }
-            }
-        }
-        
-        // If no receipt images found, use some dummy images for testing
-        if (images.isEmpty()) {
-            // Create dummy images
-            val colors = listOf(0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFFFFFF00, 0xFF00FFFF)
-            for (i in 1..5) {
-                val bitmap = Bitmap.createBitmap(300, 500, Bitmap.Config.ARGB_8888)
-                val canvas = android.graphics.Canvas(bitmap)
-                canvas.drawColor(colors[i % colors.size].toInt())
+        testImageFiles.mapNotNull { fileName ->
+            try {
+                val inputStream = assetManager.open("test_receipts/$fileName")
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream.close()
                 
-                images.add(TestImage("Test Image $i", bitmap))
+                val name = fileName.substringBeforeLast(".")
+                    .replace("_", " ")
+                    .split(" ")
+                    .joinToString(" ") { it.capitalize() }
+                
+                TestImage(name, bitmap)
+            } catch (e: Exception) {
+                null
             }
         }
-    } catch (e: IOException) {
-        e.printStackTrace()
-        
-        // Create dummy images in case of error
-        val colors = listOf(0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFFFFFF00, 0xFF00FFFF)
-        for (i in 1..5) {
-            val bitmap = Bitmap.createBitmap(300, 500, Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bitmap)
-            canvas.drawColor(colors[i % colors.size].toInt())
-            
-            images.add(TestImage("Test Image $i", bitmap))
-        }
+    } catch (e: Exception) {
+        emptyList()
     }
-    
-    images
 }
 
-/**
- * Load bitmap from assets
- */
-private fun loadBitmapFromAssets(assetManager: AssetManager, path: String): Bitmap? {
-    return try {
-        val inputStream: InputStream = assetManager.open(path)
-        BitmapFactory.decodeStream(inputStream)
-    } catch (e: IOException) {
-        e.printStackTrace()
-        null
-    }
+private fun String.capitalize(): String {
+    return if (isNotEmpty()) this[0].uppercase() + substring(1) else this
 }

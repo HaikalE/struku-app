@@ -50,6 +50,70 @@ object ReceiptPreprocessingConfigFactory {
     }
     
     /**
+     * Create a basic configuration with minimal processing
+     */
+    fun createBasicConfig(): ReceiptPreprocessingConfig {
+        return ReceiptPreprocessingConfig(
+            contrastAdjustment = 1.2f,
+            gaussianBlurRadius = 0.0f,
+            adaptiveThresholdBlockSize = 21,
+            adaptiveThresholdConstant = 10.0,
+            resizeMaxDimension = 1600,
+            performDeskew = false,
+            performSharpen = false,
+            sharpenAmount = 0.0f,
+            convertToGrayscale = true,
+            detectAndCropReceipt = false,
+            performNormalization = false,
+            optimizeForReceipts = true,
+            preprocessingLevel = PreprocessingLevel.BASIC
+        )
+    }
+    
+    /**
+     * Create an advanced configuration with moderate processing
+     */
+    fun createAdvancedConfig(): ReceiptPreprocessingConfig {
+        return ReceiptPreprocessingConfig(
+            contrastAdjustment = 1.5f,
+            gaussianBlurRadius = 0.5f,
+            adaptiveThresholdBlockSize = 25,
+            adaptiveThresholdConstant = 12.0,
+            resizeMaxDimension = 1800,
+            performDeskew = true,
+            performSharpen = true,
+            sharpenAmount = 1.0f,
+            convertToGrayscale = true,
+            detectAndCropReceipt = true,
+            performNormalization = true,
+            optimizeForReceipts = true,
+            preprocessingLevel = PreprocessingLevel.ADVANCED
+        )
+    }
+    
+    /**
+     * Create a maximum configuration with intensive processing
+     */
+    fun createMaxConfig(): ReceiptPreprocessingConfig {
+        return ReceiptPreprocessingConfig(
+            contrastAdjustment = 1.8f,
+            brightnessAdjustment = 10f,
+            gaussianBlurRadius = 0.8f,
+            adaptiveThresholdBlockSize = 35,
+            adaptiveThresholdConstant = 15.0,
+            resizeMaxDimension = 2000,
+            performDeskew = true,
+            performSharpen = true,
+            sharpenAmount = 1.5f,
+            convertToGrayscale = true,
+            detectAndCropReceipt = true,
+            performNormalization = true,
+            optimizeForReceipts = true,
+            preprocessingLevel = PreprocessingLevel.MAXIMUM
+        )
+    }
+    
+    /**
      * Create a configuration optimized for low-light or blurry images
      */
     fun createLowLightConfig(): ReceiptPreprocessingConfig {

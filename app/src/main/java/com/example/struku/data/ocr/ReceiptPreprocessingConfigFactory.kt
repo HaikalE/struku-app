@@ -45,7 +45,7 @@ object ReceiptPreprocessingConfigFactory {
             
             // Processing level - higher level means more processing
             // Use ENHANCED for better results with struk format
-            processingLevel = PreprocessingLevel.ENHANCED
+            preprocessingLevel = PreprocessingLevel.ENHANCED
         )
     }
     
@@ -67,7 +67,7 @@ object ReceiptPreprocessingConfigFactory {
             detectAndCropReceipt = true,
             performNormalization = true,
             optimizeForReceipts = true,
-            processingLevel = PreprocessingLevel.INTENSIVE
+            preprocessingLevel = PreprocessingLevel.INTENSIVE
         )
     }
     
@@ -91,7 +91,7 @@ object ReceiptPreprocessingConfigFactory {
             performNormalization = true,
             optimizeForReceipts = true,
             // Uses specific optimizations for columnar receipts
-            processingLevel = PreprocessingLevel.ENHANCED,
+            preprocessingLevel = PreprocessingLevel.ENHANCED,
             optimizeForWesternReceipts = true
         )
     }

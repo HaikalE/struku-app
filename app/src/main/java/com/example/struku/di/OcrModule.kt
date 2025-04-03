@@ -12,6 +12,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+/**
+ * Module for providing OCR related dependencies
+ * Updated with optimized components
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object OcrModule {
@@ -19,7 +23,11 @@ object OcrModule {
     @Provides
     @Singleton
     fun providePreprocessingVisualizer(@ApplicationContext context: Context): PreprocessingVisualizer {
-        return PreprocessingVisualizer(context)
+        val visualizer = PreprocessingVisualizer(context)
+        // Initialize with optimized settings
+        visualizer.setDebugMode(false) // Disable debug mode by default
+        visualizer.setSamplingRate(3) // Only capture every 3rd step to reduce overhead
+        return visualizer
     }
 
     @Provides
@@ -34,10 +42,9 @@ object OcrModule {
     @Provides
     @Singleton
     fun provideMlKitOcrEngine(
-        imagePreprocessor: AdvancedImagePreprocessor,
         @ApplicationContext context: Context
     ): MlKitOcrEngine {
-        return MlKitOcrEngine(imagePreprocessor, context)
+        return MlKitOcrEngine(context)
     }
 
     @Provides

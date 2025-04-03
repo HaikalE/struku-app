@@ -5,6 +5,9 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * Database entity for line items
+ */
 @Entity(
     tableName = "line_items",
     foreignKeys = [
@@ -15,15 +18,18 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("receiptId")]
+    indices = [
+        Index("receiptId")
+    ]
 )
 data class LineItemEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val receiptId: Long,
-    val description: String,
-    val quantity: Int,
-    val unitPrice: Double?,
+    val name: String,
     val price: Double,
-    val category: String?
+    val quantity: Double = 1.0,
+    val total: Double = price * quantity,
+    val category: String = "",
+    val notes: String? = null
 )

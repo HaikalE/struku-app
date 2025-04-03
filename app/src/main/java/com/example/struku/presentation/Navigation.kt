@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Store
@@ -30,6 +31,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -45,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -278,15 +281,28 @@ fun AddReceiptScreen(
 ) {
     var merchantName by remember { mutableStateOf("") }
     var dateString by remember { mutableStateOf("") }
-    var totalString by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    
+    // Item input state
+    var itemName by remember { mutableStateOf("") }
+    var itemQuantity by remember { mutableStateOf("1") }
+    var itemPrice by remember { mutableStateOf("") }
+    
+    // List of items
+    val items = remember { mutableStateListOf<LineItem>() }
+    
+    // Calculate total from items
+    val totalAmount = items.sumOf { it.price * it.quantity }
+    val formattedTotal = NumberFormat.getCurrencyInstance(Locale("id", "ID")).format(totalAmount)
     
     val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     val todayDateStr = dateFormat.format(Date())
     
     val categories = listOf("Makanan", "Transportasi", "Belanja", "Hiburan", "Lainnya")
-    var expanded by remember { mutableStateOf(false) }
+    var categoryExpanded by remember { mutableStateOf(false) }
+    
+    var showAddItemForm by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -330,21 +346,10 @@ fun AddReceiptScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            OutlinedTextField(
-                value = totalString,
-                onValueChange = { totalString = it },
-                label = { Text("Total (Rp)") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
             // Category dropdown
             ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it },
+                expanded = categoryExpanded,
+                onExpandedChange = { categoryExpanded = it },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 OutlinedTextField(
@@ -356,12 +361,12 @@ fun AddReceiptScreen(
                         .fillMaxWidth()
                         .menuAnchor(),
                     readOnly = true,
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) }
                 )
                 
                 ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
+                    expanded = categoryExpanded,
+                    onDismissRequest = { categoryExpanded = false },
                     modifier = Modifier.exposedDropdownSize()
                 ) {
                     categories.forEach { option ->
@@ -369,9 +374,200 @@ fun AddReceiptScreen(
                             text = { Text(option) },
                             onClick = {
                                 category = option
-                                expanded = false
+                                categoryExpanded = false
                             }
                         )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Item Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Tambah Item",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        IconButton(
+                            onClick = { showAddItemForm = !showAddItemForm }
+                        ) {
+                            Icon(
+                                if (showAddItemForm) Icons.Default.Clear else Icons.Default.Add,
+                                contentDescription = if (showAddItemForm) "Tutup Form" else "Tambah Item"
+                            )
+                        }
+                    }
+                    
+                    if (showAddItemForm) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        OutlinedTextField(
+                            value = itemName,
+                            onValueChange = { itemName = it },
+                            label = { Text("Nama Item") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = itemQuantity,
+                                onValueChange = { itemQuantity = it },
+                                label = { Text("Jumlah") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.weight(0.3f),
+                                singleLine = true
+                            )
+                            
+                            OutlinedTextField(
+                                value = itemPrice,
+                                onValueChange = { itemPrice = it },
+                                label = { Text("Harga") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(0.7f),
+                                singleLine = true
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Button(
+                            onClick = {
+                                val quantity = itemQuantity.toDoubleOrNull() ?: 1.0
+                                val price = itemPrice.toDoubleOrNull() ?: 0.0
+                                
+                                if (itemName.isNotBlank() && price > 0) {
+                                    val newItem = LineItem(
+                                        name = itemName,
+                                        quantity = quantity,
+                                        price = price,
+                                        unitPrice = price
+                                    )
+                                    
+                                    items.add(newItem)
+                                    
+                                    // Reset input fields
+                                    itemName = ""
+                                    itemQuantity = "1"
+                                    itemPrice = ""
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = itemName.isNotBlank() && itemPrice.isNotBlank()
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("TAMBAH ITEM")
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Item List
+            if (items.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Daftar Item",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        items.forEachIndexed { index, item ->
+                            if (index > 0) {
+                                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                            } else {
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    
+                                    Text(
+                                        text = "${item.getFormattedQuantity()} x ${NumberFormat.getCurrencyInstance(Locale("id", "ID")).format(item.unitPrice ?: item.price)}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                
+                                Text(
+                                    text = item.getFormattedTotal(),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                
+                                IconButton(
+                                    onClick = { items.removeAt(index) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Clear,
+                                        contentDescription = "Hapus",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        
+                        // Total
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Total",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            Text(
+                                text = formattedTotal,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -380,14 +576,8 @@ fun AddReceiptScreen(
             
             Button(
                 onClick = {
-                    if (merchantName.isNotBlank() && totalString.isNotBlank()) {
+                    if (merchantName.isNotBlank() && items.isNotEmpty()) {
                         isLoading = true
-                        
-                        val total = try {
-                            totalString.replace(".", "").replace(",", ".").toDouble()
-                        } catch (e: Exception) {
-                            0.0
-                        }
                         
                         val date = try {
                             dateFormat.parse(dateString.ifEmpty { todayDateStr }) ?: Date()
@@ -399,9 +589,9 @@ fun AddReceiptScreen(
                         val receipt = Receipt(
                             merchantName = merchantName,
                             date = date,
-                            total = total,
+                            total = totalAmount,
                             category = category,
-                            items = emptyList()
+                            items = items.toList()
                         )
                         
                         // Use IO context for DB operation
@@ -423,7 +613,7 @@ fun AddReceiptScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = merchantName.isNotBlank() && totalString.isNotBlank() && !isLoading
+                enabled = merchantName.isNotBlank() && items.isNotEmpty() && !isLoading
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(

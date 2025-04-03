@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -264,7 +265,7 @@ fun ReceiptReviewContent(
     onDateChange: (Date) -> Unit,
     onCategoryChange: (String) -> Unit,
     onItemDescriptionChange: (Int, String) -> Unit,
-    onItemQuantityChange: (Int, Int) -> Unit,
+    onItemQuantityChange: (Int, Double) -> Unit,
     onItemPriceChange: (Int, Double) -> Unit,
     onAddItem: () -> Unit,
     onRemoveItem: (Int) -> Unit
@@ -502,7 +503,7 @@ fun CategoryDropdown(
 fun LineItemRow(
     item: LineItem,
     onDescriptionChange: (String) -> Unit,
-    onQuantityChange: (Int) -> Unit,
+    onQuantityChange: (Double) -> Unit,
     onPriceChange: (Double) -> Unit,
     onRemove: () -> Unit
 ) {
@@ -535,7 +536,7 @@ fun LineItemRow(
                     value = item.quantity.toString(),
                     onValueChange = { 
                         try {
-                            val newQty = it.toIntOrNull() ?: return@OutlinedTextField
+                            val newQty = it.toDoubleOrNull() ?: return@OutlinedTextField
                             if (newQty > 0) {
                                 onQuantityChange(newQty)
                             }

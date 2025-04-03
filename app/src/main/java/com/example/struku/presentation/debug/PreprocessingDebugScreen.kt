@@ -1,10 +1,8 @@
 package com.example.struku.presentation.debug
 
-import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -14,8 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,45 +26,38 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.DocumentScanner
-import androidx.compose.material.icons.filled.Photo
-import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,7 +66,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -87,10 +75,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.struku.data.ocr.PreprocessingVisualizer
-import com.example.struku.data.ocr.ReceiptType
-import com.example.struku.domain.model.ReceiptImage
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -99,7 +86,7 @@ import java.util.Locale
 /**
  * Screen for debugging and visualizing preprocessing OCR
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PreprocessingDebugScreen(
     viewModel: PreprocessingDebugViewModel = hiltViewModel(),
@@ -110,132 +97,45 @@ fun PreprocessingDebugScreen(
     val processingSteps by viewModel.processingSteps.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val isDebugMode by viewModel.isDebugMode.collectAsState()
-    val selectedConfigType by viewModel.selectedConfigType.collectAsState()
+    val statusMessage by viewModel.statusMessage.collectAsState()
+    val availableConfigs = viewModel.availableConfigs
     
+    // State for dropdown
+    var selectedConfigIndex by remember { mutableStateOf(0) }
+    var isConfigExpanded by remember { mutableStateOf(false) }
+    
+    // State for UI
     var selectedStep by remember { mutableStateOf<PreprocessingVisualizer.ProcessingStep?>(null) }
-    var showImagePickerDialog by remember { mutableStateOf(false) }
-    var showConfigDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
     
-    // Image picker intent
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.data?.let { uri ->
-                viewModel.processImageFromUri(uri, context.contentResolver)
-            }
+    // Image picker
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.processImageFromUri(it)
+        }
+    }
+
+    // Show snackbar for status messages
+    LaunchedEffect(statusMessage) {
+        statusMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearStatusMessage()
         }
     }
     
-    // Image source dialog
-    if (showImagePickerDialog) {
-        AlertDialog(
-            onDismissRequest = { showImagePickerDialog = false },
-            title = { Text("Select Image Source") },
-            text = {
-                Column {
-                    Text("Choose an image source for preprocessing test")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        // Camera option
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    showImagePickerDialog = false
-                                    onCaptureImage()
-                                }
-                                .padding(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Camera,
-                                    contentDescription = "Camera",
-                                    modifier = Modifier.size(32.dp),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Camera")
-                        }
-                        
-                        // Gallery option
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-                                    imagePickerLauncher.launch(intent)
-                                    showImagePickerDialog = false
-                                }
-                                .padding(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Photo,
-                                    contentDescription = "Gallery",
-                                    modifier = Modifier.size(32.dp),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Gallery")
-                        }
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("OCR Preprocessing Debug") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showImagePickerDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-    
-    // Configuration dialog
-    if (showConfigDialog) {
-        AlertDialog(
-            onDismissRequest = { showConfigDialog = false },
-            title = { Text("Preprocessing Configuration") },
-            text = {
-                Column {
-                    Text("Select receipt type for preprocessing")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        viewModel.availableConfigs.forEach { receiptType ->
-                            FilterChip(
-                                selected = selectedConfigType == receiptType,
-                                onClick = { viewModel.setReceiptType(receiptType) },
-                                label = { Text(receiptType.name) }
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Divider()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
+                },
+                actions = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -247,46 +147,6 @@ fun PreprocessingDebugScreen(
                         )
                     }
                     
-                    Text(
-                        "Debug mode captures detailed information at each preprocessing step",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showConfigDialog = false }) {
-                    Text("Close")
-                }
-            }
-        )
-    }
-    
-    // Step detail dialog
-    if (selectedStep != null) {
-        StepDetailDialog(
-            step = selectedStep!!,
-            onDismiss = { selectedStep = null },
-            onSave = { viewModel.saveStepImage(it) }
-        )
-    }
-    
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Preprocessing Debug") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    // Settings button
-                    IconButton(onClick = { showConfigDialog = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                    
-                    // Save summary button
                     IconButton(onClick = { viewModel.saveDebugSummary() }) {
                         Icon(Icons.Default.Save, contentDescription = "Save Summary")
                     }
@@ -294,81 +154,161 @@ fun PreprocessingDebugScreen(
             )
         }
     ) { paddingValues ->
+        if (selectedStep != null) {
+            StepDetailDialog(
+                step = selectedStep!!,
+                onDismiss = { selectedStep = null },
+                onSave = { 
+                    val file = viewModel.saveStepImage(it)
+                    file?.let { savedFile ->
+                        // Share the file
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.provider",
+                            savedFile
+                        )
+                        
+                        val shareIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            type = "image/jpeg"
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        
+                        context.startActivity(Intent.createChooser(shareIntent, "Share Image"))
+                    }
+                }
+            )
+        }
+        
         Box(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(16.dp)
             ) {
-                // Image source buttons
-                ElevatedCard(
+                // Configuration selection
+                Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth()
                     ) {
                         Text(
-                            "Image Source",
-                            style = MaterialTheme.typography.titleMedium
+                            "Preprocessing Configuration",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ExposedDropdownMenuBox(
+                            expanded = isConfigExpanded,
+                            onExpandedChange = { isConfigExpanded = it },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Button(
-                                onClick = { showImagePickerDialog = true },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.PhotoCamera, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Select Image")
-                            }
-                            
-                            Button(
-                                onClick = { viewModel.processWithAllConfigs(processingSteps.first().imageBitmap) },
-                                modifier = Modifier.weight(1f),
-                                enabled = processingSteps.isNotEmpty() && !isProcessing
-                            ) {
-                                Icon(Icons.Default.Compare, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Test All Configs")
-                            }
-                        }
-                        
-                        if (processingSteps.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Current config: ${selectedConfigType.name}",
-                                style = MaterialTheme.typography.bodySmall
+                            OutlinedTextField(
+                                value = availableConfigs[selectedConfigIndex].first,
+                                onValueChange = {},
+                                readOnly = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isConfigExpanded)
+                                },
+                                supportingText = {
+                                    Text("Select preprocessing configuration to apply")
+                                },
+                                enabled = !isProcessing
                             )
+                            
+                            ExposedDropdownMenu(
+                                expanded = isConfigExpanded,
+                                onDismissRequest = { isConfigExpanded = false }
+                            ) {
+                                availableConfigs.forEachIndexed { index, config ->
+                                    DropdownMenuItem(
+                                        text = { Text(config.first) },
+                                        onClick = {
+                                            selectedConfigIndex = index
+                                            viewModel.setConfigByIndex(index)
+                                            isConfigExpanded = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
+                // Button row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Button(
+                        onClick = { onCaptureImage() },
+                        enabled = !isProcessing,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.DocumentScanner, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Camera")
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Button(
+                        onClick = { galleryLauncher.launch("image/*") },
+                        enabled = !isProcessing,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Gallery")
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Button(
+                        onClick = { viewModel.resetSession() },
+                        enabled = !isProcessing,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.BugReport, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Reset")
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Processing steps section
                 if (isProcessing) {
                     ProcessingIndicator()
                 } else if (processingSteps.isEmpty()) {
                     EmptyState(
-                        onCaptureImage = { showImagePickerDialog = true }
+                        onCaptureImage = onCaptureImage,
+                        onPickFromGallery = { galleryLauncher.launch("image/*") }
                     )
                 } else {
                     Text(
                         "Processing Steps (${processingSteps.size})",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                     
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 150.dp),
+                        columns = GridCells.Fixed(2),
                         contentPadding = PaddingValues(4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -378,68 +318,6 @@ fun PreprocessingDebugScreen(
                             StepThumbnail(
                                 step = step,
                                 onClick = { selectedStep = step }
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Button(
-                            onClick = { showImagePickerDialog = true }
-                        ) {
-                            Icon(Icons.Default.PhotoCamera, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("New Image")
-                        }
-                        
-                        Button(
-                            onClick = { viewModel.resetSession() }
-                        ) {
-                            Icon(Icons.Default.BugReport, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Reset Session")
-                        }
-                    }
-                }
-            }
-            
-            // Overlay for processing state
-            if (isProcessing) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .padding(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(48.dp)
-                            )
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
-                            
-                            Text(
-                                "Processing Image",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            
-                            Text(
-                                "Preprocessing with multiple steps...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -625,8 +503,8 @@ fun StepDetailDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.LightGray.copy(alpha = 0.3f))
-                        .padding(8.dp),
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
@@ -634,7 +512,15 @@ fun StepDetailDialog(
                     ) {
                         Icon(Icons.Default.Save, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Save Image")
+                        Text("Save & Share")
+                    }
+                    
+                    Button(
+                        onClick = onDismiss
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Close")
                     }
                 }
             }
@@ -651,10 +537,11 @@ fun ProcessingIndicator() {
         verticalArrangement = Arrangement.Center
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(64.dp)
+            modifier = Modifier.size(80.dp),
+            strokeWidth = 6.dp
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         Text(
             "Processing Image...",
@@ -673,7 +560,8 @@ fun ProcessingIndicator() {
 
 @Composable
 fun EmptyState(
-    onCaptureImage: () -> Unit
+    onCaptureImage: () -> Unit,
+    onPickFromGallery: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -682,7 +570,7 @@ fun EmptyState(
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            Icons.Outlined.Image,
+            Icons.Default.BugReport,
             contentDescription = null,
             modifier = Modifier.size(100.dp),
             tint = MaterialTheme.colorScheme.secondary
@@ -698,19 +586,31 @@ fun EmptyState(
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            "Capture a receipt image to see\npre-processing steps and visualization.",
+            "Capture a receipt image or select from gallery\nto see pre-processing steps.",
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        Button(
-            onClick = onCaptureImage
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(Icons.Default.DocumentScanner, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Select Image Source")
+            Button(
+                onClick = onCaptureImage
+            ) {
+                Icon(Icons.Default.DocumentScanner, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Camera")
+            }
+            
+            Button(
+                onClick = onPickFromGallery
+            ) {
+                Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Gallery")
+            }
         }
     }
 }

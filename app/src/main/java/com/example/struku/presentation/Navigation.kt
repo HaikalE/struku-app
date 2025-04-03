@@ -155,7 +155,7 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
         ScannerScreen(navController)
     }
     
-    // Receipt add screen (previously missing)
+    // Receipt add screen
     composable(NavRoutes.RECEIPT_ADD) {
         val viewModel = hiltViewModel<AddReceiptViewModel>()
         AddReceiptScreen(
@@ -182,6 +182,15 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
     // Receipt review screen
     composable(
         route = NavRoutes.RECEIPT_REVIEW,
+        arguments = listOf(navArgument("receiptId") { type = NavType.LongType })
+    ) { backStackEntry ->
+        val receiptId = backStackEntry.arguments?.getLong("receiptId") ?: 0L
+        ReceiptReviewScreen(receiptId, navController)
+    }
+    
+    // Receipt edit screen (redirects to review screen)
+    composable(
+        route = NavRoutes.RECEIPT_EDIT,
         arguments = listOf(navArgument("receiptId") { type = NavType.LongType })
     ) { backStackEntry ->
         val receiptId = backStackEntry.arguments?.getLong("receiptId") ?: 0L

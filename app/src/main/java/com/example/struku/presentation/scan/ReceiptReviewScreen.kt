@@ -81,6 +81,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiptReviewScreen(
+    receiptId: Long,
     navController: NavController,
     viewModel: ReceiptReviewViewModel = hiltViewModel()
 ) {
@@ -92,9 +93,7 @@ fun ReceiptReviewScreen(
     var showSavedDialog by remember { mutableStateOf(false) }
     
     // Load receipt data from saved state
-    LaunchedEffect(Unit) {
-        // Note: We'll get the receipt ID from the navigation arguments or state
-        val receiptId = viewModel.state.value.savedReceiptId ?: 0L
+    LaunchedEffect(receiptId) {
         if (receiptId > 0) {
             viewModel.loadReceipt(receiptId)
         }
@@ -287,7 +286,7 @@ fun ReceiptReviewContent(
         OutlinedTextField(
             value = receipt.merchantName,
             onValueChange = onMerchantNameChange,
-            label = { Text(stringResource(id = R.string.receipt_merchant)) },
+            label = { Text("Nama Pedagang") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
@@ -303,7 +302,7 @@ fun ReceiptReviewContent(
             OutlinedTextField(
                 value = dateFormatter.format(receipt.date),
                 onValueChange = { /* Will use date picker */ },
-                label = { Text(stringResource(id = R.string.receipt_date)) },
+                label = { Text("Tanggal") },
                 modifier = Modifier.weight(1f),
                 readOnly = true,
                 singleLine = true,
@@ -326,7 +325,7 @@ fun ReceiptReviewContent(
         
         // Line items section
         Text(
-            text = stringResource(id = R.string.receipt_items),
+            text = "Daftar Item",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -477,7 +476,7 @@ fun CategoryDropdown(
             value = selectedCategory,
             onValueChange = {},
             readOnly = true,
-            label = { Text(stringResource(id = R.string.receipt_category)) },
+            label = { Text("Kategori") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -521,7 +520,7 @@ fun LineItemRow(
         Column(modifier = Modifier.padding(8.dp)) {
             // Description
             OutlinedTextField(
-                value = item.description,
+                value = item.name,
                 onValueChange = onDescriptionChange,
                 label = { Text("Deskripsi") },
                 modifier = Modifier.fillMaxWidth(),

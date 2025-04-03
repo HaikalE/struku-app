@@ -32,10 +32,9 @@ class ReceiptReviewViewModel @Inject constructor(
         loadCategories()
         
         // Check if we have a receiptId in the saved state handle
-        savedStateHandle.get<Long>("receiptId")?.let { receiptId ->
-            if (receiptId > 0) {
-                loadReceipt(receiptId)
-            }
+        val receiptId = savedStateHandle.get<Long>("receiptId") ?: 0L
+        if (receiptId > 0) {
+            loadReceipt(receiptId)
         }
     }
     

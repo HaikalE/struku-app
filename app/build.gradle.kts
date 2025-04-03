@@ -56,8 +56,18 @@ android {
         compose = true
         viewBinding = true
         prefab = true  // Properly configured prefab feature
-        // Disable data binding to avoid the error with dataBindingMergeDependencyArtifactsDebug
+        // Disable data binding completely to avoid the error
         dataBinding = false
+        buildConfig = true
+    }
+    
+    // Explicitly disable dataBinding task configuration
+    tasks.withType<com.android.build.gradle.internal.tasks.databinding.DataBindingGenBaseClassesTask> {
+        enabled = false
+    }
+    
+    tasks.withType<com.android.build.gradle.internal.tasks.databinding.DataBindingMergeDependencyArtifactsTask> {
+        enabled = false
     }
     
     composeOptions {

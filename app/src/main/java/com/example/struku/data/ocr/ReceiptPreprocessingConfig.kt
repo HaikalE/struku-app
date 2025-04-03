@@ -72,7 +72,7 @@ data class ReceiptPreprocessingConfig(
     /**
      * Level of preprocessing to apply
      */
-    val processingLevel: PreprocessingLevel = PreprocessingLevel.STANDARD,
+    val preprocessingLevel: PreprocessingLevel = PreprocessingLevel.STANDARD,
     
     /**
      * Whether to optimize specifically for Western receipt formats with clear columns
@@ -102,5 +102,15 @@ data class ReceiptPreprocessingConfig(
     /**
      * Enable removal of background patterns often found in receipts
      */
-    val removeBackgroundPatterns: Boolean = true
+    val removeBackgroundPatterns: Boolean = true,
+    
+    /**
+     * Type of receipt to optimize processing for
+     */
+    val receiptType: ReceiptType = ReceiptType.STANDARD,
+    
+    /**
+     * Whether preprocessing is enabled
+     */
+    val enabled: Boolean = true
 )

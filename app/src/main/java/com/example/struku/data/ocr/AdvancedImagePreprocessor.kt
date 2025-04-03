@@ -51,7 +51,7 @@ class AdvancedImagePreprocessor @Inject constructor(
         }
         
         // Resize image first to optimize processing
-        val maxDimension = 800 // Reduced from original 1200 resolution for faster processing
+        val maxDimension = 1200 // Increased from 800 to improve OCR quality
         val resizedBitmap = resizeImageIfNeeded(bitmap, maxDimension)
         
         // Start with a copy of the resized image
@@ -65,19 +65,37 @@ class AdvancedImagePreprocessor @Inject constructor(
         )
         
         try {
+            // Check if the image is a typical receipt format (long vertical format)
+            val isReceiptFormat = bitmap.height > bitmap.width * 1.5
+            
             // Apply processing based on level (optimized versions)
             processedImage = when (config.preprocessingLevel) {
                 PreprocessingLevel.BASIC -> {
                     applyOptimizedBasicPreprocessing(processedImage)
                 }
                 PreprocessingLevel.STANDARD -> {
-                    applyOptimizedAdvancedPreprocessing(processedImage, config)
+                    if (isReceiptFormat) {
+                        // Prioritize text clarity for receipt-shaped images
+                        applyReceiptOptimizedPreprocessing(processedImage, config)
+                    } else {
+                        applyOptimizedAdvancedPreprocessing(processedImage, config)
+                    }
                 }
                 PreprocessingLevel.ENHANCED -> {
-                    applyOptimizedAdvancedPreprocessing(processedImage, config)
+                    if (isReceiptFormat) {
+                        // Prioritize text clarity for receipt-shaped images
+                        applyReceiptOptimizedPreprocessing(processedImage, config)
+                    } else {
+                        applyOptimizedAdvancedPreprocessing(processedImage, config)
+                    }
                 }
                 PreprocessingLevel.ADVANCED -> {
-                    applyOptimizedAdvancedPreprocessing(processedImage, config)
+                    if (isReceiptFormat) {
+                        // Prioritize text clarity for receipt-shaped images
+                        applyReceiptOptimizedPreprocessing(processedImage, config)
+                    } else {
+                        applyOptimizedAdvancedPreprocessing(processedImage, config)
+                    }
                 }
                 PreprocessingLevel.INTENSIVE -> {
                     applyOptimizedMaximumPreprocessing(processedImage, config)
@@ -168,6 +186,181 @@ class AdvancedImagePreprocessor @Inject constructor(
     }
     
     /**
+     * Apply preprocessing optimized specifically for receipt formats with item lists
+     */
+    private fun applyReceiptOptimizedPreprocessing(bitmap: Bitmap, config: ReceiptPreprocessingConfig): Bitmap {
+        // First apply basic preprocessing
+        var processedImage = applyOptimizedBasicPreprocessing(bitmap)
+        
+        // Apply specific brightness adjustment to make text clearer
+        processedImage = adjustBrightness(processedImage, 10f)
+        visualizer.captureProcessingStep(
+            "Brightness Adjusted",
+            "Optimized brightness for receipt text",
+            processedImage
+        )
+        
+        // Apply a moderate sharpening to improve text edges
+        processedImage = applySharpening(processedImage, 1.2f)
+        visualizer.captureProcessingStep(
+            "Sharpened",
+            "Applied sharpening to improve text clarity",
+            processedImage
+        )
+        
+        // Apply noise reduction that preserves text details
+        processedImage = applyNoiseReductionForText(processedImage)
+        visualizer.captureProcessingStep(
+            "Text-optimized Noise Reduction",
+            "Applied noise reduction optimized for text",
+            processedImage
+        )
+        
+        // Apply receipt-optimized thresholding
+        processedImage = applyReceiptOptimizedThreshold(processedImage)
+        visualizer.captureProcessingStep(
+            "Receipt-optimized Threshold",
+            "Applied thresholding optimized for item lists",
+            processedImage
+        )
+        
+        return processedImage
+    }
+    
+    /**
+     * Apply thresholding optimized for receipt-style text with numbers and columns
+     */
+    private fun applyReceiptOptimizedThreshold(bitmap: Bitmap): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        
+        // Get pixels
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val resultPixels = IntArray(width * height)
+        
+        // Use a smaller block size for finer details
+        val blockSize = 15
+        val radius = blockSize / 2
+        val constant = 5.0 // Lower constant to better preserve text
+        
+        // Apply adaptive threshold with full processing (no skip)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val blockAvg = calculateOptimizedBlockAverage(pixels, width, height, x, y, radius)
+                val threshold = blockAvg - constant
+                
+                val index = y * width + x
+                val pixelValue = Color.red(pixels[index])
+                val newValue = if (pixelValue > threshold) 255 else 0
+                resultPixels[index] = Color.rgb(newValue, newValue, newValue)
+            }
+        }
+        
+        result.setPixels(resultPixels, 0, width, 0, 0, width, height)
+        return result
+    }
+    
+    /**
+     * Apply noise reduction optimized for preserving text details
+     */
+    private fun applyNoiseReductionForText(bitmap: Bitmap): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        
+        // Use a small radius to preserve text details
+        return applyFastBlur(bitmap, 1)
+    }
+    
+    /**
+     * Apply sharpening to emphasize text edges
+     */
+    private fun applySharpening(bitmap: Bitmap, amount: Float): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        
+        // Define a simple sharpening convolution matrix
+        val matrix = floatArrayOf(
+            0f, -amount, 0f,
+            -amount, 1 + 4 * amount, -amount,
+            0f, -amount, 0f
+        )
+        
+        // Apply the convolution - optimized version that skips edges
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val resultPixels = IntArray(width * height)
+        
+        for (y in 1 until height - 1) {
+            for (x in 1 until width - 1) {
+                var red = 0f
+                var green = 0f
+                var blue = 0f
+                
+                // Apply convolution
+                for (ky in -1..1) {
+                    for (kx in -1..1) {
+                        val pixel = pixels[(y + ky) * width + (x + kx)]
+                        val k = matrix[(ky + 1) * 3 + (kx + 1)]
+                        
+                        red += Color.red(pixel) * k
+                        green += Color.green(pixel) * k
+                        blue += Color.blue(pixel) * k
+                    }
+                }
+                
+                // Clamp values to valid range
+                red = min(255f, max(0f, red))
+                green = min(255f, max(0f, green))
+                blue = min(255f, max(0f, blue))
+                
+                resultPixels[y * width + x] = Color.rgb(red.toInt(), green.toInt(), blue.toInt())
+            }
+        }
+        
+        // Copy edge pixels unchanged
+        for (y in 0 until height) {
+            resultPixels[y * width] = pixels[y * width]
+            resultPixels[y * width + width - 1] = pixels[y * width + width - 1]
+        }
+        for (x in 0 until width) {
+            resultPixels[x] = pixels[x]
+            resultPixels[(height - 1) * width + x] = pixels[(height - 1) * width + x]
+        }
+        
+        result.setPixels(resultPixels, 0, width, 0, 0, width, height)
+        return result
+    }
+    
+    /**
+     * Adjust image brightness
+     */
+    private fun adjustBrightness(bitmap: Bitmap, brightness: Float): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        
+        val canvas = Canvas(result)
+        val paint = Paint()
+        
+        // Create color matrix to adjust brightness
+        val colorMatrix = ColorMatrix()
+        colorMatrix.set(floatArrayOf(
+            1f, 0f, 0f, 0f, brightness,
+            0f, 1f, 0f, 0f, brightness,
+            0f, 0f, 1f, 0f, brightness,
+            0f, 0f, 0f, 1f, 0f
+        ))
+        
+        paint.colorFilter = ColorMatrixColorFilter(colorMatrix)
+        canvas.drawBitmap(bitmap, 0f, 0f, paint)
+        
+        return result
+    }
+    
+    /**
      * Apply optimized advanced preprocessing (grayscale, contrast, noise reduction)
      */
     private fun applyOptimizedAdvancedPreprocessing(bitmap: Bitmap, config: ReceiptPreprocessingConfig): Bitmap {
@@ -220,6 +413,14 @@ class AdvancedImagePreprocessor @Inject constructor(
                 processedImage
             )
         }
+        
+        // Apply sharpening for improved OCR accuracy
+        processedImage = applySharpening(processedImage, 1.0f)
+        visualizer.captureProcessingStep(
+            "Sharpened",
+            "Applied sharpening for improved OCR clarity",
+            processedImage
+        )
         
         return processedImage
     }

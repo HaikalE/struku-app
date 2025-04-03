@@ -25,9 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import org.opencv.android.OpenCVLoader
-import org.opencv.android.Utils
-import org.opencv.core.Mat
+import org.openpnp.opencv.OpenCV
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.GpuDelegate
 import java.io.ByteArrayOutputStream
@@ -85,8 +83,8 @@ class AdvancedImagePreprocessor @Inject constructor(
     // Initialize OpenCV if available
     init {
         try {
-            OpenCVLoader.initDebug()
-            Log.d(TAG, "OpenCV initialized successfully")
+            OpenCV.loadShared()
+            Log.d(TAG, "OpenPnP OpenCV initialized successfully")
         } catch (e: Exception) {
             Log.e(TAG, "OpenCV initialization failed: ${e.message}")
         }

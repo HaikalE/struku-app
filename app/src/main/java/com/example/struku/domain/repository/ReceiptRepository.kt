@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
  */
 interface ReceiptRepository {
     /**
-     * Get all receipts as a Flow
+     * Get all receipts
      */
     fun getReceipts(): Flow<List<Receipt>>
     

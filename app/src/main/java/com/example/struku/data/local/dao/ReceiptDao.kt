@@ -81,14 +81,14 @@ interface ReceiptDao {
     /**
      * Get total spending by category
      */
-    @Query("SELECT category, SUM(total) as total FROM receipts GROUP BY category")
-    fun getTotalByCategory(): Flow<Map<String, Double>>
+    @Query("SELECT category as categoryName, SUM(total) as categoryTotal FROM receipts GROUP BY category")
+    fun getTotalByCategory(): Flow<List<CategoryTotal>>
     
     /**
      * Get total spending by month
      */
-    @Query("SELECT strftime('%Y-%m', datetime(date/1000, 'unixepoch')) as month, SUM(total) as total FROM receipts GROUP BY month ORDER BY month")
-    fun getTotalByMonth(): Flow<Map<String, Double>>
+    @Query("SELECT strftime('%Y-%m', datetime(date/1000, 'unixepoch')) as monthName, SUM(total) as monthTotal FROM receipts GROUP BY monthName ORDER BY monthName")
+    fun getTotalByMonth(): Flow<List<MonthTotal>>
     
     /**
      * Insert a new line item
@@ -121,3 +121,19 @@ interface ReceiptDao {
     @Query("SELECT * FROM line_items WHERE receiptId = :receiptId")
     suspend fun getLineItemsForReceipt(receiptId: Long): List<LineItemEntity>
 }
+
+/**
+ * Data class for category totals
+ */
+data class CategoryTotal(
+    val categoryName: String,
+    val categoryTotal: Double
+)
+
+/**
+ * Data class for month totals
+ */
+data class MonthTotal(
+    val monthName: String,
+    val monthTotal: Double
+)

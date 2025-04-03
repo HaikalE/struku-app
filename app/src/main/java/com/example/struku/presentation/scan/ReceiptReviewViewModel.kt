@@ -28,7 +28,7 @@ class ReceiptReviewViewModel @Inject constructor(
     private val _state = MutableStateFlow(ReceiptReviewState())
     val state: StateFlow<ReceiptReviewState> = _state
     
-    // The receipt ID to be reviewed
+    // The receipt ID to be reviewed - use "receiptId" as the parameter name consistently
     private val receiptId: Long = savedStateHandle["receiptId"] ?: 0L
     
     init {

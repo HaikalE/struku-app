@@ -56,6 +56,8 @@ android {
         compose = true
         viewBinding = true
         prefab = true  // Properly configured prefab feature
+        // Disable data binding to avoid the error with dataBindingMergeDependencyArtifactsDebug
+        dataBinding = false
     }
     
     composeOptions {
@@ -107,16 +109,13 @@ dependencies {
     // ML Kit for OCR with proper dependency resolution
     implementation("com.google.mlkit:text-recognition:16.0.0")
     
-    // ML Kit document scanner
-    implementation("com.google.mlkit:document-scanner:16.0.0") {
-        exclude(group = "org.tensorflow", module = "tensorflow-lite")
-        exclude(group = "org.tensorflow", module = "tensorflow-lite-api")
-    }
+    // ML Kit document scanner - use text-recognition instead for now
+    // Commented out because the official artifact is not publicly available
+    // implementation("com.google.mlkit:document-scanner:16.0.0")
     
-    // OpenCV for advanced image processing - using a more stable distribution
-    implementation("org.opencv:opencv-android:4.8.0") {
-        exclude(group = "com.android.support", module = "*") // Exclude legacy support libraries
-    }
+    // OpenCV for advanced image processing
+    // Use an alternative Java-based OpenCV library instead
+    implementation("org.openpnp:opencv:4.5.1-2")
     
     // TensorFlow Lite with proper dependency management
     implementation("org.tensorflow:tensorflow-lite:2.13.0") {

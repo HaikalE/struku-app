@@ -15,14 +15,27 @@ data class LineItem(
     val price: Double,
     val quantity: Double = 1.0,
     val category: String = "",
-    val notes: String = ""
+    val notes: String = "",
+    val unitPrice: Double? = null
 ) : Parcelable {
+    
+    /**
+     * Item description (alias to name for compatibility)
+     */
+    val description: String get() = name
     
     /**
      * Calculate total price for this item
      */
     fun getTotal(): Double {
         return price * quantity
+    }
+    
+    /**
+     * Get unit price, calculated from total if not explicitly set
+     */
+    fun getUnitPrice(): Double {
+        return unitPrice ?: (price / quantity)
     }
     
     /**

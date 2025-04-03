@@ -30,11 +30,12 @@ class PreprocessingVisualizer @Inject constructor(
     
     private val tag = "ProcessingVisualizer"
     
-    // Debug mode flag - default to false to reduce overhead
-    private var debugMode = false
+    // Debug mode flag - default to true for debug views
+    private var debugMode = true
     
     // Sampling rate to reduce overhead (only capture 1 in N processing steps)
-    private var samplingRate = 2
+    // Default to 1 (capture all steps) in debug mode
+    private var samplingRate = 1
     private var stepCounter = 0
     
     // Keep track of processing steps for visualization
@@ -42,7 +43,7 @@ class PreprocessingVisualizer @Inject constructor(
     val processingSteps: List<ProcessingStep> = _processingSteps
     
     // Max number of steps to store to avoid memory issues
-    private val maxStoredSteps = 10
+    private val maxStoredSteps = 20
     
     /**
      * A single step in the preprocessing pipeline
@@ -60,6 +61,12 @@ class PreprocessingVisualizer @Inject constructor(
      */
     fun setDebugMode(enabled: Boolean) {
         debugMode = enabled
+        Log.d(tag, "Debug mode set to: $enabled")
+        
+        // When debug mode is enabled, set sampling rate to 1 to capture all steps
+        if (enabled) {
+            samplingRate = 1
+        }
     }
     
     /**
@@ -68,6 +75,7 @@ class PreprocessingVisualizer @Inject constructor(
     fun startNewSession() {
         _processingSteps.clear()
         stepCounter = 0
+        Log.d(tag, "Started new debug session")
     }
     
     /**
@@ -83,19 +91,26 @@ class PreprocessingVisualizer @Inject constructor(
      */
     fun setSamplingRate(rate: Int) {
         samplingRate = rate.coerceAtLeast(1)
+        Log.d(tag, "Sampling rate set to: $samplingRate")
     }
     
     /**
      * Capture a processing step for visualization with reduced overhead
      */
     fun captureProcessingStep(name: String, description: String, image: Bitmap) {
-        if (!debugMode) return
+        if (!debugMode) {
+            Log.d(tag, "Skipping step capture (debug mode off): $name")
+            return
+        }
         
         // Increment counter
         stepCounter++
         
         // Only capture every Nth step to reduce overhead
-        if (stepCounter % samplingRate != 0) return
+        if (stepCounter % samplingRate != 0) {
+            Log.d(tag, "Skipping step capture (sampling): $name")
+            return
+        }
         
         Log.d(tag, "Captured processing step: $name")
         
@@ -116,6 +131,8 @@ class PreprocessingVisualizer @Inject constructor(
                     imageBitmap = downsampledImage
                 )
             )
+            
+            Log.d(tag, "Total processing steps: ${_processingSteps.size}")
         }
     }
     
@@ -127,7 +144,7 @@ class PreprocessingVisualizer @Inject constructor(
         
         // If image is already small enough, use it directly
         if (original.width <= maxDimension && original.height <= maxDimension) {
-            return original
+            return original.copy(original.config, true)
         }
         
         // Calculate new dimensions
@@ -190,7 +207,10 @@ class PreprocessingVisualizer @Inject constructor(
      */
     fun generateProcessingSummary(): Bitmap? {
         synchronized(_processingSteps) {
-            if (_processingSteps.isEmpty()) return null
+            if (_processingSteps.isEmpty()) {
+                Log.w(tag, "Cannot generate summary: No processing steps available")
+                return null
+            }
             
             // Create a grid of images
             val numImages = _processingSteps.size
@@ -244,6 +264,7 @@ class PreprocessingVisualizer @Inject constructor(
                 )
             }
             
+            Log.d(tag, "Generated summary with ${_processingSteps.size} steps")
             return result
         }
     }

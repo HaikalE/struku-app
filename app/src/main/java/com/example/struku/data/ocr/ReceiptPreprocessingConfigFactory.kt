@@ -21,6 +21,39 @@ object ReceiptPreprocessingConfigFactory {
     }
     
     /**
+     * Create a basic config with minimal preprocessing
+     */
+    fun createBasicConfig(): ReceiptPreprocessingConfig {
+        return ReceiptPreprocessingConfig(
+            receiptType = ReceiptType.AUTO_DETECT,
+            preprocessingLevel = PreprocessingLevel.BASIC,
+            enabled = true
+        )
+    }
+    
+    /**
+     * Create an advanced config with medium preprocessing
+     */
+    fun createAdvancedConfig(): ReceiptPreprocessingConfig {
+        return ReceiptPreprocessingConfig(
+            receiptType = ReceiptType.AUTO_DETECT,
+            preprocessingLevel = PreprocessingLevel.ADVANCED,
+            enabled = true
+        )
+    }
+    
+    /**
+     * Create a maximum config with full preprocessing
+     */
+    fun createMaxConfig(): ReceiptPreprocessingConfig {
+        return ReceiptPreprocessingConfig(
+            receiptType = ReceiptType.AUTO_DETECT,
+            preprocessingLevel = PreprocessingLevel.MAXIMUM,
+            enabled = true
+        )
+    }
+    
+    /**
      * Create a speed-optimized configuration
      * Uses minimal preprocessing for faster processing
      */

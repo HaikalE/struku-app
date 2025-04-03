@@ -83,6 +83,7 @@ class PreprocessingDebugViewModel @Inject constructor(
                 
                 val effectiveConfig = config ?: ReceiptPreprocessingConfig(
                     receiptType = ReceiptType.AUTO_DETECT,
+                    preprocessingLevel = PreprocessingLevel.ADVANCED,
                     enabled = true
                 )
                 
@@ -165,10 +166,22 @@ class PreprocessingDebugViewModel @Inject constructor(
                 
                 // Run different processing configs in parallel
                 val configs = listOf(
-                    ReceiptPreprocessingConfigFactory.speedOptimizedConfig().copy(receiptType = ReceiptType.AUTO_DETECT),
-                    ReceiptPreprocessingConfigFactory.qualityOptimizedConfig().copy(receiptType = ReceiptType.AUTO_DETECT),
-                    ReceiptPreprocessingConfigFactory.thermalReceiptConfig(),
-                    ReceiptPreprocessingConfigFactory.formalReceiptConfig()
+                    ReceiptPreprocessingConfigFactory.createConfig(
+                        receiptType = ReceiptType.AUTO_DETECT,
+                        preprocessingLevel = PreprocessingLevel.BASIC
+                    ),
+                    ReceiptPreprocessingConfigFactory.createConfig(
+                        receiptType = ReceiptType.AUTO_DETECT,
+                        preprocessingLevel = PreprocessingLevel.MAXIMUM
+                    ),
+                    ReceiptPreprocessingConfigFactory.createConfig(
+                        receiptType = ReceiptType.THERMAL,
+                        preprocessingLevel = PreprocessingLevel.ADVANCED
+                    ),
+                    ReceiptPreprocessingConfigFactory.createConfig(
+                        receiptType = ReceiptType.INKJET,
+                        preprocessingLevel = PreprocessingLevel.ADVANCED
+                    )
                 )
                 
                 for (config in configs) {

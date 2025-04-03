@@ -14,7 +14,7 @@ class CategorizeExpenseUseCase @Inject constructor(
      * Memprediksi kategori dari struk berdasarkan nama pedagang dan item
      */
     suspend operator fun invoke(receipt: Receipt): String {
-        val itemDescriptions = receipt.items.map { it.description }
-        return categoryRepository.predictCategory(receipt.merchantName, itemDescriptions)
+        val itemNames = receipt.items.map { it.name }
+        return categoryRepository.predictCategory(receipt.merchantName, itemNames)
     }
 }

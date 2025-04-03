@@ -38,19 +38,6 @@ object RepositoryModule {
     }
     
     /**
-     * Provide OCR repository implementation
-     */
-    @Provides
-    @Singleton
-    fun provideOcrRepository(
-        ocrEngine: MlKitOcrEngine,
-        imagePreprocessor: AdvancedImagePreprocessor,
-        receiptParser: ReceiptParser
-    ): OcrRepository {
-        return OcrRepositoryImpl(ocrEngine, imagePreprocessor, receiptParser)
-    }
-    
-    /**
      * Provide receipt mapper
      */
     @Provides
@@ -96,5 +83,18 @@ object RepositoryModule {
     @Singleton
     fun provideReceiptParser(): ReceiptParser {
         return ReceiptParser()
+    }
+    
+    /**
+     * Provide OCR repository implementation
+     */
+    @Provides
+    @Singleton
+    fun provideOcrRepository(
+        ocrEngine: MlKitOcrEngine,
+        imagePreprocessor: AdvancedImagePreprocessor,
+        receiptParser: ReceiptParser
+    ): OcrRepository {
+        return OcrRepositoryImpl(ocrEngine, imagePreprocessor, receiptParser)
     }
 }

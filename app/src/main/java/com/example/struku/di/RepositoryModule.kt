@@ -8,6 +8,7 @@ import com.example.struku.data.mapper.ReceiptMapper
 import com.example.struku.data.ocr.AdvancedImagePreprocessor
 import com.example.struku.data.ocr.MlKitOcrEngine
 import com.example.struku.data.ocr.PreprocessingVisualizer
+import com.example.struku.data.ocr.ReceiptParser
 import com.example.struku.data.repository.BudgetRepositoryImpl
 import com.example.struku.data.repository.CategoryRepositoryImpl
 import com.example.struku.data.repository.OcrRepositoryImpl

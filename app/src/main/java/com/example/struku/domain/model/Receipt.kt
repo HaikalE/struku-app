@@ -1,75 +1,86 @@
 package com.example.struku.domain.model
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import androidx.room.Relation
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize
+import kotlinx.parcelize.RawValue
+import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 /**
- * Receipt entity for database storage
+ * Receipt domain model
  */
-@Entity(tableName = "receipts")
 @Parcelize
 data class Receipt(
-    @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val merchantName: String,
-    val date: Long,
+    val date: @RawValue Date,
     val total: Double,
+    val currency: String? = "IDR",
     val category: String = "",
+    val imageUri: String? = null,
+    val items: List<LineItem> = emptyList(),
     val notes: String = "",
-    val imagePath: String? = null,
-    
-    // These are populated by Room's relationship query
-    @Transient
-    val items: List<LineItem> = emptyList()
+    val createdAt: @RawValue Date? = null,
+    val updatedAt: @RawValue Date? = null
 ) : Parcelable {
     
     /**
      * Formatted date string
      */
     fun getFormattedDate(): String {
-        val dateObj = Date(date)
-        val format = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
-        return format.format(dateObj)
+        val format = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+        return format.format(date)
     }
     
     /**
      * Formatted total amount
      */
     fun getFormattedTotal(): String {
-        val format = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID"))
+        val format = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
         return format.format(total)
+    }
+    
+    /**
+     * Check if receipt has detailed line items
+     */
+    fun hasItems(): Boolean {
+        return items.isNotEmpty()
+    }
+    
+    /**
+     * Get total amount calculated from line items
+     */
+    fun getCalculatedTotal(): Double {
+        return items.sumOf { it.price * it.quantity }
+    }
+    
+    /**
+     * Check if receipt has a consistency issue between stated total and calculated total
+     */
+    fun hasTotalDiscrepancy(): Boolean {
+        if (!hasItems()) return false
+        
+        val calculatedTotal = getCalculatedTotal()
+        val difference = Math.abs(calculatedTotal - total)
+        
+        // Allow a small difference (0.5% of total)
+        val tolerance = total * 0.005
+        
+        return difference > tolerance
     }
 }
 
 /**
- * Receipt with its line items (for Room relationship query)
+ * Line item domain model
  */
-data class ReceiptWithItems(
-    @Relation(
-        parentColumn = "id",
-        entityColumn = "receiptId"
-    )
-    val receipt: Receipt,
-    val items: List<LineItem>
-)
-
-/**
- * Line item entity for database storage
- */
-@Entity(tableName = "line_items")
 @Parcelize
 data class LineItem(
-    @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val receiptId: Long,
     val name: String,
     val price: Double,
     val quantity: Double = 1.0,
-    val total: Double = price * quantity,
     val category: String = "",
     val notes: String = ""
 ) : Parcelable {
@@ -78,7 +89,7 @@ data class LineItem(
      * Formatted price
      */
     fun getFormattedPrice(): String {
-        val format = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID"))
+        val format = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
         return format.format(price)
     }
     
@@ -86,7 +97,18 @@ data class LineItem(
      * Formatted total
      */
     fun getFormattedTotal(): String {
-        val format = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("id", "ID"))
-        return format.format(total)
+        val format = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+        return format.format(price * quantity)
+    }
+    
+    /**
+     * Formatted quantity
+     */
+    fun getFormattedQuantity(): String {
+        return if (quantity == quantity.toInt().toDouble()) {
+            quantity.toInt().toString()
+        } else {
+            String.format("%.2f", quantity)
+        }
     }
 }

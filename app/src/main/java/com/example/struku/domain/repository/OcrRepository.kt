@@ -1,30 +1,47 @@
 package com.example.struku.domain.repository
 
 import android.graphics.Bitmap
-import com.example.struku.domain.model.Receipt
+import com.example.struku.data.ocr.ReceiptPreprocessingConfig
 
 /**
- * Repository interface untuk operasi OCR
+ * Repository interface for OCR operations
  */
 interface OcrRepository {
-    /**
-     * Menjalankan OCR pada gambar dan mengekstrak teks
-     */
-    suspend fun recognizeText(image: Bitmap): String
     
     /**
-     * Mengurai teks OCR menjadi objek struk
+     * Parse receipt text to extract structured data
+     * 
+     * @param text OCR recognized text
+     * @return Map of extracted data fields
      */
-    suspend fun parseReceiptText(text: String): Receipt?
+    suspend fun parseReceiptText(text: String): Map<String, Any>
     
     /**
-     * Menjalankan OCR dan parsing dalam satu langkah
+     * Recognize text from a receipt image
+     * 
+     * @param bitmap Image to process
+     * @return Recognized text
      */
-    suspend fun scanReceipt(image: Bitmap): Receipt?
+    suspend fun recognizeReceiptImage(bitmap: Bitmap): String
     
     /**
-     * Menyimpan gambar struk ke penyimpanan lokal
-     * @return URI dari gambar yang disimpan
+     * Process a receipt image to extract structured data
+     * Uses default preprocessing configuration
+     * 
+     * @param bitmap Image to process
+     * @return Map of extracted data fields
      */
-    suspend fun saveReceiptImage(image: Bitmap, receiptId: Long): String
+    suspend fun processReceipt(bitmap: Bitmap): Map<String, Any>
+    
+    /**
+     * Process a receipt image with custom preprocessing config
+     * 
+     * @param bitmap Image to process
+     * @param config Custom preprocessing configuration
+     * @return Map of extracted data fields
+     */
+    suspend fun processReceipt(
+        bitmap: Bitmap,
+        config: ReceiptPreprocessingConfig
+    ): Map<String, Any>
 }

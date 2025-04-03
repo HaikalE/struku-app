@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.struku.data.ocr.AdvancedImagePreprocessor
+import com.example.struku.data.ocr.PreprocessingLevel
 import com.example.struku.data.ocr.PreprocessingVisualizer
 import com.example.struku.data.ocr.ReceiptPreprocessingConfig
 import com.example.struku.data.ocr.ReceiptPreprocessingConfigFactory
@@ -32,15 +33,15 @@ class PreprocessingDebugViewModel @Inject constructor(
     
     private val TAG = "PreprocessingDebugVM"
     
-    // Status saat ini
+    // Current status
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing = _isProcessing.asStateFlow()
     
-    // Mode debug
+    // Debug mode
     private val _isDebugMode = MutableStateFlow(true)
     val isDebugMode = _isDebugMode.asStateFlow()
     
-    // Langkah preprocessing dari visualizer
+    // Preprocessing steps from visualizer
     val processingSteps = preprocessingVisualizer.processingSteps
         .stateIn(
             viewModelScope,
@@ -53,12 +54,12 @@ class PreprocessingDebugViewModel @Inject constructor(
     val processedImage = _processedImage.asStateFlow()
     
     init {
-        // Aktifkan mode debug secara default
+        // Enable debug mode by default
         preprocessingVisualizer.setDebugMode(true)
     }
     
     /**
-     * Aktifkan/nonaktifkan mode debug
+     * Enable/disable debug mode
      */
     fun setDebugMode(enabled: Boolean) {
         _isDebugMode.value = enabled
@@ -73,7 +74,7 @@ class PreprocessingDebugViewModel @Inject constructor(
     }
     
     /**
-     * Proses gambar dengan pipeline preprocessing lengkap
+     * Process image with full preprocessing pipeline
      */
     fun processImage(bitmap: Bitmap, config: ReceiptPreprocessingConfig? = null) {
         viewModelScope.launch {
@@ -85,14 +86,14 @@ class PreprocessingDebugViewModel @Inject constructor(
                     enabled = true
                 )
                 
-                // Proses gambar dengan pipeline lengkap
+                // Process image with full pipeline
                 val processedImage = withContext(Dispatchers.Default) {
                     imagePreprocessor.processReceiptImage(bitmap, effectiveConfig)
                 }
                 
                 _processedImage.value = processedImage
                 
-                // Buat perbandingan sebelum-sesudah
+                // Create before-after comparison
                 if (_isDebugMode.value) {
                     val comparisonImage = preprocessingVisualizer.generateBeforeAfterComparison(
                         bitmap,
@@ -116,7 +117,7 @@ class PreprocessingDebugViewModel @Inject constructor(
     }
     
     /**
-     * Simpan gambar tahapan preprocessing
+     * Save preprocessing step image
      */
     fun saveStepImage(step: PreprocessingVisualizer.ProcessingStep): File? {
         return preprocessingVisualizer.saveVisualizationToGallery(
@@ -126,7 +127,7 @@ class PreprocessingDebugViewModel @Inject constructor(
     }
     
     /**
-     * Simpan ringkasan debug
+     * Save debug summary
      */
     fun saveDebugSummary() {
         viewModelScope.launch {
@@ -145,7 +146,7 @@ class PreprocessingDebugViewModel @Inject constructor(
     }
     
     /**
-     * Proses gambar dengan berbagai konfigurasi untuk perbandingan
+     * Process image with various configurations for comparison
      */
     fun processComparisons(bitmap: Bitmap) {
         viewModelScope.launch {
@@ -196,7 +197,7 @@ class PreprocessingDebugViewModel @Inject constructor(
                     when (config.preprocessingLevel) {
                         PreprocessingLevel.BASIC -> "Speed Optimized"
                         PreprocessingLevel.MAXIMUM -> "Quality Optimized"
-                        else -> "Auto Detect"
+                        PreprocessingLevel.ADVANCED -> "Auto Detect"
                     }
                 }
             }

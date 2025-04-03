@@ -33,7 +33,11 @@ class AdvancedImagePreprocessor @Inject constructor(
      * Process a receipt image with the specified configuration
      */
     fun processReceiptImage(bitmap: Bitmap, config: ReceiptPreprocessingConfig): Bitmap {
+        // Log start of processing
+        Log.d(TAG, "Starting processing of image ${bitmap.width}x${bitmap.height} with level ${config.preprocessingLevel}")
+        
         if (!config.enabled) {
+            Log.d(TAG, "Processing disabled, returning original image")
             return bitmap
         }
         
@@ -42,6 +46,7 @@ class AdvancedImagePreprocessor @Inject constructor(
         
         // Check if a processed version exists in the cache
         preprocessingCache[cacheKey]?.let {
+            Log.d(TAG, "Using cached processed image")
             return it
         }
         
@@ -75,12 +80,14 @@ class AdvancedImagePreprocessor @Inject constructor(
             
             // Cache the result
             preprocessingCache[cacheKey] = processedImage
+            Log.d(TAG, "Processed image cached with key: $cacheKey")
             
             // Limit cache size to prevent memory issues
             if (preprocessingCache.size > 3) {
                 // Remove oldest entry
                 preprocessingCache.entries.firstOrNull()?.let {
                     preprocessingCache.remove(it.key)
+                    Log.d(TAG, "Removed oldest cached image: ${it.key}")
                 }
             }
             
@@ -90,6 +97,7 @@ class AdvancedImagePreprocessor @Inject constructor(
             return resizedBitmap
         }
         
+        Log.d(TAG, "Image processing complete")
         return processedImage
     }
     
@@ -123,6 +131,7 @@ class AdvancedImagePreprocessor @Inject constructor(
             newWidth = (maxDimension * ratio).toInt()
         }
         
+        Log.d(TAG, "Resizing image from ${width}x${height} to ${newWidth}x${newHeight}")
         return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
     }
     
@@ -415,6 +424,8 @@ class AdvancedImagePreprocessor @Inject constructor(
      * Clear any cached preprocessing results
      */
     fun clearCache() {
+        val cacheSize = preprocessingCache.size
         preprocessingCache.clear()
+        Log.d(TAG, "Cleared image preprocessing cache ($cacheSize entries)")
     }
 }

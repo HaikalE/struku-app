@@ -125,6 +125,13 @@ class ReceiptRepositoryImpl @Inject constructor(
         }
     }
     
+    override suspend fun getTotalByCategory(startDate: Date, endDate: Date): Map<String, Double> {
+        val startTimestamp = startDate.time
+        val endTimestamp = endDate.time
+        val categoryTotals = receiptDao.getTotalByCategoryInDateRange(startTimestamp, endTimestamp)
+        return categoryTotals.associate { it.categoryName to it.categoryTotal }
+    }
+    
     override fun getTotalByMonth(): Flow<Map<String, Double>> {
         return receiptDao.getTotalByMonth().map { monthTotals ->
             monthTotals.associate { it.monthName to it.monthTotal }

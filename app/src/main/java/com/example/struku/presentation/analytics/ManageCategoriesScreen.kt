@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Reorder
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -634,7 +635,7 @@ fun EmptyCategoriesState() {
         verticalAlignment = Arrangement.Center
     ) {
         Icon(
-            Icons.Default.Category,
+            Icons.Default.PieChart,
             contentDescription = null,
             modifier = Modifier.size(100.dp),
             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)

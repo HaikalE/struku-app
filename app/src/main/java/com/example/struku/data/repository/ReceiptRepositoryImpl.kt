@@ -120,10 +120,14 @@ class ReceiptRepositoryImpl @Inject constructor(
     }
     
     override fun getTotalByCategory(): Flow<Map<String, Double>> {
-        return receiptDao.getTotalByCategory()
+        return receiptDao.getTotalByCategory().map { categoryTotals ->
+            categoryTotals.associate { it.categoryName to it.categoryTotal }
+        }
     }
     
     override fun getTotalByMonth(): Flow<Map<String, Double>> {
-        return receiptDao.getTotalByMonth()
+        return receiptDao.getTotalByMonth().map { monthTotals ->
+            monthTotals.associate { it.monthName to it.monthTotal }
+        }
     }
 }

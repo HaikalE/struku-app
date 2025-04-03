@@ -160,7 +160,7 @@ class ReceiptReviewViewModel @Inject constructor(
             val receipt = state.receipt ?: return@update state
             val items = receipt.items.toMutableList()
             items.add(LineItem(
-                receiptId = receipt.id,
+                // Fixed: removed receiptId parameter that doesn't exist in LineItem constructor
                 name = "",
                 quantity = 1.0,
                 price = 0.0

@@ -28,6 +28,9 @@ object NavRoutes {
     const val SETTINGS_CATEGORIES = "settings_categories"
     const val SETTINGS_BUDGETS = "settings_budgets"
     
+    // Debug related
+    const val DEBUG_PREPROCESSING = "debug_preprocessing"
+    
     // Route helpers with arguments
     fun receiptDetail(receiptId: Long) = "receipt_detail/$receiptId"
     fun receiptEdit(receiptId: Long) = "receipt_edit/$receiptId"

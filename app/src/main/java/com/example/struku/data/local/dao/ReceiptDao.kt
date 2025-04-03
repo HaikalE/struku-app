@@ -85,6 +85,12 @@ interface ReceiptDao {
     fun getTotalByCategory(): Flow<List<CategoryTotal>>
     
     /**
+     * Get total spending by category within date range
+     */
+    @Query("SELECT category as categoryName, SUM(total) as categoryTotal FROM receipts WHERE date BETWEEN :startDate AND :endDate GROUP BY category")
+    suspend fun getTotalByCategoryInDateRange(startDate: Long, endDate: Long): List<CategoryTotal>
+    
+    /**
      * Get total spending by month
      */
     @Query("SELECT strftime('%Y-%m', datetime(date/1000, 'unixepoch')) as monthName, SUM(total) as monthTotal FROM receipts GROUP BY monthName ORDER BY monthName")

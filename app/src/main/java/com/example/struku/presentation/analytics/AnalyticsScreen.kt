@@ -18,8 +18,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Divider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MenuBook
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,7 +38,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -74,6 +76,8 @@ import kotlin.math.min
 fun AnalyticsScreen(
     onMonthClick: (year: Int, month: Int) -> Unit,
     onCategoryClick: (categoryId: String) -> Unit,
+    onManageBudgetClick: () -> Unit,
+    onManageCategoriesClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AnalyticsViewModel = hiltViewModel()
 ) {
@@ -143,7 +147,7 @@ fun AnalyticsScreen(
             )
         }
         
-        // Add buttons for managing budget and seeing trends
+        // Add buttons for managing budget and categories
         Spacer(modifier = Modifier.height(32.dp))
         
         Row(
@@ -151,7 +155,7 @@ fun AnalyticsScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = { onCategoryClick("budgets") },
+                onClick = { onManageBudgetClick() },
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(Icons.Default.MenuBook, contentDescription = null)
@@ -160,12 +164,12 @@ fun AnalyticsScreen(
             }
             
             Button(
-                onClick = { selectedVisualizationType = VisualizationType.TREND },
+                onClick = { onManageCategoriesClick() },
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(Icons.Default.TrendingUp, contentDescription = null)
+                Icon(Icons.Default.PieChart, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Lihat Tren")
+                Text("Kelola Kategori")
             }
         }
         
@@ -514,7 +518,7 @@ fun ExpenseTrendCard(state: AnalyticsState) {
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            HorizontalDivider()
+            Divider()
             
             Spacer(modifier = Modifier.height(16.dp))
             

@@ -33,8 +33,12 @@ class AdvancedImagePreprocessor @Inject constructor(
             return bitmap
         }
         
-        // Start with a copy of the original
-        var processedImage = bitmap.copy(bitmap.config, true)
+        // Resize image first to optimize processing
+        val maxDimension = 1200 // Reduced from original 8MP resolution
+        val resizedBitmap = resizeImageIfNeeded(bitmap, maxDimension)
+        
+        // Start with a copy of the resized image
+        var processedImage = resizedBitmap.copy(resizedBitmap.config, true)
         
         // Capture the original for debug
         visualizer.captureProcessingStep(
@@ -58,11 +62,37 @@ class AdvancedImagePreprocessor @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error during image preprocessing: ${e.message}", e)
-            // Return original if processing fails
-            return bitmap
+            // Return resized bitmap if processing fails
+            return resizedBitmap
         }
         
         return processedImage
+    }
+    
+    /**
+     * Resize image if it exceeds the maximum dimension
+     */
+    private fun resizeImageIfNeeded(bitmap: Bitmap, maxDimension: Int): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        
+        if (width <= maxDimension && height <= maxDimension) {
+            return bitmap
+        }
+        
+        val ratio = width.toFloat() / height.toFloat()
+        val newWidth: Int
+        val newHeight: Int
+        
+        if (width > height) {
+            newWidth = maxDimension
+            newHeight = (maxDimension / ratio).toInt()
+        } else {
+            newHeight = maxDimension
+            newWidth = (maxDimension * ratio).toInt()
+        }
+        
+        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
     }
     
     /**
@@ -95,24 +125,24 @@ class AdvancedImagePreprocessor @Inject constructor(
         // First apply basic preprocessing
         var processedImage = applyBasicPreprocessing(bitmap, config)
         
-        // Apply noise reduction
-        processedImage = applyNoiseReduction(processedImage)
+        // Apply a faster noise reduction (using simpler algorithm)
+        processedImage = applyFastNoiseReduction(processedImage)
         visualizer.captureProcessingStep(
             "Noise Reduction",
             "Applied noise reduction filter",
             processedImage
         )
         
-        // Apply adaptive thresholding based on receipt type
+        // Apply faster adaptive thresholding based on receipt type
         when (config.receiptType) {
             ReceiptType.THERMAL -> {
-                processedImage = applyAdaptiveThreshold(processedImage, 15, 2.0)
+                processedImage = applyFastAdaptiveThreshold(processedImage, 8, 2.0)
             }
             ReceiptType.INKJET, ReceiptType.LASER -> {
-                processedImage = applyAdaptiveThreshold(processedImage, 11, 1.0)
+                processedImage = applyFastAdaptiveThreshold(processedImage, 5, 1.0)
             }
             else -> {
-                processedImage = applyAdaptiveThreshold(processedImage, 11, 1.5)
+                processedImage = applyFastAdaptiveThreshold(processedImage, 8, 1.5)
             }
         }
         
@@ -207,10 +237,61 @@ class AdvancedImagePreprocessor @Inject constructor(
     }
     
     /**
-     * Apply noise reduction
+     * Apply faster noise reduction (simple blur)
      */
-    private fun applyNoiseReduction(bitmap: Bitmap): Bitmap {
-        // Simple implementation of a blur filter
+    private fun applyFastNoiseReduction(bitmap: Bitmap): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val result = IntArray(width * height)
+        
+        // Simple blur - just average of surrounding pixels (faster than median filter)
+        for (y in 1 until height - 1) {
+            for (x in 1 until width - 1) {
+                val idx = y * width + x
+                
+                // Get average of 3x3 pixels
+                var sumR = 0
+                var sumG = 0
+                var sumB = 0
+                
+                for (dy in -1..1) {
+                    for (dx in -1..1) {
+                        val pixel = pixels[(y + dy) * width + (x + dx)]
+                        sumR += Color.red(pixel)
+                        sumG += Color.green(pixel)
+                        sumB += Color.blue(pixel)
+                    }
+                }
+                
+                val avgR = sumR / 9
+                val avgG = sumG / 9
+                val avgB = sumB / 9
+                
+                result[idx] = Color.rgb(avgR, avgG, avgB)
+            }
+        }
+        
+        // Copy edges
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val idx = y * width + x
+                if (y == 0 || x == 0 || y == height - 1 || x == width - 1) {
+                    result[idx] = pixels[idx]
+                }
+            }
+        }
+        
+        val resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        resultBitmap.setPixels(result, 0, width, 0, 0, width, height)
+        return resultBitmap
+    }
+    
+    /**
+     * Apply faster adaptive threshold with downsampling
+     */
+    private fun applyFastAdaptiveThreshold(bitmap: Bitmap, blockSize: Int, constant: Double): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
         val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -220,36 +301,28 @@ class AdvancedImagePreprocessor @Inject constructor(
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         val resultPixels = IntArray(width * height)
         
-        // Apply median filter
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val index = y * width + x
+        // Skip pixels to improve speed - process every 2nd pixel
+        val radius = blockSize / 2
+        val skipFactor = 2
+        
+        // Process image with skipping
+        for (y in 0 until height step skipFactor) {
+            for (x in 0 until width step skipFactor) {
+                val blockAvg = calculateBlockAverage(pixels, width, height, x, y, radius)
+                val threshold = blockAvg - constant
                 
-                // Skip edge pixels
-                if (x == 0 || y == 0 || x == width - 1 || y == height - 1) {
-                    resultPixels[index] = pixels[index]
-                    continue
+                // Apply the same threshold to the skipFactor x skipFactor block
+                for (dy in 0 until skipFactor) {
+                    if (y + dy >= height) continue
+                    for (dx in 0 until skipFactor) {
+                        if (x + dx >= width) continue
+                        
+                        val index = (y + dy) * width + (x + dx)
+                        val pixelValue = Color.red(pixels[index])
+                        val newValue = if (pixelValue > threshold) 255 else 0
+                        resultPixels[index] = Color.rgb(newValue, newValue, newValue)
+                    }
                 }
-                
-                // Get 3x3 neighborhood
-                val neighbors = arrayOf(
-                    pixels[(y - 1) * width + (x - 1)],
-                    pixels[(y - 1) * width + x],
-                    pixels[(y - 1) * width + (x + 1)],
-                    pixels[y * width + (x - 1)],
-                    pixels[index],
-                    pixels[y * width + (x + 1)],
-                    pixels[(y + 1) * width + (x - 1)],
-                    pixels[(y + 1) * width + x],
-                    pixels[(y + 1) * width + (x + 1)]
-                )
-                
-                // Calculate median for each channel
-                val r = neighbors.map { Color.red(it) }.sorted()[4]
-                val g = neighbors.map { Color.green(it) }.sorted()[4]
-                val b = neighbors.map { Color.blue(it) }.sorted()[4]
-                
-                resultPixels[index] = Color.rgb(r, g, b)
             }
         }
         
@@ -258,46 +331,23 @@ class AdvancedImagePreprocessor @Inject constructor(
     }
     
     /**
-     * Apply adaptive thresholding
+     * Calculate average pixel value in a block - optimized version
      */
-    private fun applyAdaptiveThreshold(bitmap: Bitmap, blockSize: Int, constant: Double): Bitmap {
-        val width = bitmap.width
-        val height = bitmap.height
-        val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    private fun calculateBlockAverage(pixels: IntArray, width: Int, height: Int, centerX: Int, centerY: Int, radius: Int): Double {
+        var sum = 0
+        var count = 0
         
-        // Get pixels
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        val resultPixels = IntArray(width * height)
+        // Sample fewer pixels from the block to improve speed
+        val sampleStep = 2
         
-        // Apply adaptive threshold
-        val radius = blockSize / 2
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val index = y * width + x
-                val pixelValue = Color.red(pixels[index]) // Use red channel for grayscale
-                
-                // Calculate local threshold
-                var sum = 0
-                var count = 0
-                
-                for (ny in max(0, y - radius) until min(height, y + radius + 1)) {
-                    for (nx in max(0, x - radius) until min(width, x + radius + 1)) {
-                        sum += Color.red(pixels[ny * width + nx])
-                        count++
-                    }
-                }
-                
-                val threshold = sum / count - constant
-                
-                // Apply threshold
-                val newValue = if (pixelValue > threshold) 255 else 0
-                resultPixels[index] = Color.rgb(newValue, newValue, newValue)
+        for (y in max(0, centerY - radius) until min(height, centerY + radius + 1) step sampleStep) {
+            for (x in max(0, centerX - radius) until min(width, centerX + radius + 1) step sampleStep) {
+                sum += Color.red(pixels[y * width + x])
+                count++
             }
         }
         
-        result.setPixels(resultPixels, 0, width, 0, 0, width, height)
-        return result
+        return if (count > 0) sum.toDouble() / count else 0.0
     }
     
     /**
@@ -306,6 +356,12 @@ class AdvancedImagePreprocessor @Inject constructor(
     private fun sharpenImage(bitmap: Bitmap): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
+        
+        // Skip sharpening for large images to save time
+        if (width * height > 1000000) {
+            return bitmap
+        }
+        
         val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         
         // Get pixels

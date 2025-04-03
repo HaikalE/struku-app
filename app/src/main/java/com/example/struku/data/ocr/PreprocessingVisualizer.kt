@@ -11,9 +11,6 @@ import android.os.Environment
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.opencv.android.Utils
-import org.opencv.core.Mat
-import org.opencv.imgproc.Imgproc
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -23,7 +20,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Visualisasi hasil dari setiap tahap pre-processing untuk keperluan debugging dan fine-tuning
+ * Visualization of each preprocessing stage for debugging and fine-tuning
  */
 @Singleton
 class PreprocessingVisualizer @Inject constructor(
@@ -35,14 +32,14 @@ class PreprocessingVisualizer @Inject constructor(
         private const val MAX_STORED_SESSIONS = 5
     }
     
-    // Menyimpan gambar-gambar hasil preprocessing dari sesi terakhir
+    // Store preprocessing result images from the last session
     private val _processingSteps = MutableStateFlow<List<ProcessingStep>>(emptyList())
     val processingSteps = _processingSteps.asStateFlow()
     
     private var currentSessionId: String = generateSessionId()
     private var debugMode: Boolean = false
     
-    // Model untuk menyimpan tahapan preprocessing
+    // Model for storing preprocessing steps
     data class ProcessingStep(
         val id: String,
         val name: String,
@@ -52,7 +49,7 @@ class PreprocessingVisualizer @Inject constructor(
     )
     
     /**
-     * Aktifkan atau nonaktifkan mode debug
+     * Enable or disable debug mode
      */
     fun setDebugMode(enabled: Boolean) {
         debugMode = enabled
@@ -67,7 +64,7 @@ class PreprocessingVisualizer @Inject constructor(
     }
     
     /**
-     * Reset sesi debugging dan mulai sesi baru
+     * Reset debugging session and start a new one
      */
     fun startNewSession() {
         currentSessionId = generateSessionId()
@@ -76,7 +73,7 @@ class PreprocessingVisualizer @Inject constructor(
     }
     
     /**
-     * Catat gambar hasil tahapan preprocessing
+     * Capture preprocessing step image
      */
     fun captureProcessingStep(
         stepName: String,
@@ -110,30 +107,24 @@ class PreprocessingVisualizer @Inject constructor(
     }
     
     /**
-     * Capture Mat dari OpenCV
+     * Capture Mat from OpenCV (simplified method that accepts Bitmap instead)
      */
     fun captureProcessingStepMat(
         stepName: String, 
         description: String, 
-        mat: Mat
+        bitmap: Bitmap
     ) {
         if (!debugMode) return
         
         try {
-            val bitmap = Bitmap.createBitmap(
-                mat.cols(), 
-                mat.rows(), 
-                Bitmap.Config.ARGB_8888
-            )
-            Utils.matToBitmap(mat, bitmap)
             captureProcessingStep(stepName, description, bitmap)
         } catch (e: Exception) {
-            Log.e(TAG, "Error capturing OpenCV Mat: ${e.message}", e)
+            Log.e(TAG, "Error capturing Mat: ${e.message}", e)
         }
     }
     
     /**
-     * Generate visualisasi perbandingan sebelum-sesudah
+     * Generate before-after comparison visualization
      */
     fun generateBeforeAfterComparison(
         originalBitmap: Bitmap,
@@ -209,7 +200,7 @@ class PreprocessingVisualizer @Inject constructor(
     }
     
     /**
-     * Generate composite visualization dari semua steps
+     * Generate composite visualization of all steps
      */
     fun generateProcessingSummary(): Bitmap? {
         val steps = _processingSteps.value
@@ -287,7 +278,7 @@ class PreprocessingVisualizer @Inject constructor(
     }
     
     /**
-     * Simpan hasil visualisasi ke storage
+     * Save visualization to storage
      */
     fun saveVisualizationToGallery(bitmap: Bitmap, name: String): File? {
         try {
@@ -331,7 +322,7 @@ class PreprocessingVisualizer @Inject constructor(
     }
     
     /**
-     * Simpan step ke storage
+     * Save step to storage
      */
     private fun saveStepToStorage(step: ProcessingStep) {
         try {

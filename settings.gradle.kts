@@ -15,6 +15,11 @@ dependencyResolutionManagement {
         maven { url = uri("https://maven.pkg.jetbrains.space/public/p/compose/dev") } // For Compose
         // For OpenCV
         maven { url = uri("https://maven.aliyun.com/repository/public") }
+        // Additional Maven repositories for OpenCV
+        maven { url = uri("https://maven.scijava.org/content/repositories/public/") }
+        maven { url = uri("https://repo.osgeo.org/repository/release/") }
+        maven { url = uri("https://repository.mulesoft.org/nexus/content/repositories/public/") }
+        maven { url = uri("https://packages.confluent.io/maven/") }
     }
 }
 

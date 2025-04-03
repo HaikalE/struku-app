@@ -18,8 +18,8 @@ object OcrModule {
 
     @Provides
     @Singleton
-    fun providePreprocessingVisualizer(): PreprocessingVisualizer {
-        return PreprocessingVisualizer()
+    fun providePreprocessingVisualizer(@ApplicationContext context: Context): PreprocessingVisualizer {
+        return PreprocessingVisualizer(context)
     }
 
     @Provides

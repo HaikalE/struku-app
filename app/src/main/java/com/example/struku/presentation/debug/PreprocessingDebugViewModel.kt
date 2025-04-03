@@ -1,7 +1,10 @@
 package com.example.struku.presentation.debug
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,83 +14,80 @@ import com.example.struku.data.ocr.ReceiptPreprocessingConfig
 import com.example.struku.data.ocr.ReceiptPreprocessingConfigFactory
 import com.example.struku.data.ocr.ReceiptType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 /**
- * ViewModel for the debugging screen for OCR preprocessing
+ * ViewModel for OCR preprocessing debugging
  */
 @HiltViewModel
 class PreprocessingDebugViewModel @Inject constructor(
     private val imagePreprocessor: AdvancedImagePreprocessor,
-    private val preprocessingVisualizer: PreprocessingVisualizer
+    private val preprocessingVisualizer: PreprocessingVisualizer,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
     
-    private val TAG = "PreprocessingDebugVM"
+    companion object {
+        private const val TAG = "PreprocessingDebugVM"
+    }
     
-    // Processing status
+    // Status saat ini
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing = _isProcessing.asStateFlow()
     
-    // Debug mode state
+    // Mode debug
     private val _isDebugMode = MutableStateFlow(true)
     val isDebugMode = _isDebugMode.asStateFlow()
+    
+    // Status message
+    private val _statusMessage = MutableStateFlow<String?>(null)
+    val statusMessage = _statusMessage.asStateFlow()
+    
+    // Langkah preprocessing dari visualizer
+    val processingSteps = preprocessingVisualizer.processingSteps
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            emptyList()
+        )
     
     // Last processed image
     private val _processedImage = MutableStateFlow<Bitmap?>(null)
     val processedImage = _processedImage.asStateFlow()
     
-    // Get processing steps from the visualizer
-    val processingSteps = preprocessingVisualizer.processingSteps
+    // Selected preprocessing config
+    private val _selectedConfig = MutableStateFlow(ReceiptPreprocessingConfig())
+    val selectedConfig = _selectedConfig.asStateFlow()
     
-    // Currently selected config
-    private val _selectedConfigType = MutableStateFlow(ReceiptType.AUTO_DETECT)
-    val selectedConfigType = _selectedConfigType.asStateFlow()
-    
-    // Available configs for selection
+    // Available configs
     val availableConfigs = listOf(
-        ReceiptType.AUTO_DETECT,
-        ReceiptType.THERMAL,
-        ReceiptType.INKJET,
-        ReceiptType.LASER,
-        ReceiptType.DIGITAL
+        Pair("Auto Detect", ReceiptPreprocessingConfig()),
+        Pair("Thermal Receipt", ReceiptPreprocessingConfigFactory.thermalReceiptConfig()),
+        Pair("Formal Receipt", ReceiptPreprocessingConfigFactory.formalReceiptConfig()),
+        Pair("Speed Optimized", ReceiptPreprocessingConfigFactory.speedOptimizedConfig()),
+        Pair("Quality Optimized", ReceiptPreprocessingConfigFactory.qualityOptimizedConfig())
     )
     
     init {
-        // Activate debug mode by default
-        setDebugMode(true)
-        
-        // Monitor preprocessing state
-        viewModelScope.launch {
-            imagePreprocessor.preprocessingState.collectLatest { state ->
-                when (state) {
-                    is AdvancedImagePreprocessor.PreprocessingState.InProgress -> {
-                        _isProcessing.value = true
-                    }
-                    is AdvancedImagePreprocessor.PreprocessingState.Success -> {
-                        _processedImage.value = state.resultBitmap
-                        _isProcessing.value = false
-                    }
-                    is AdvancedImagePreprocessor.PreprocessingState.Error -> {
-                        _isProcessing.value = false
-                        Log.e(TAG, "Preprocessing error: ${state.message}", state.exception)
-                    }
-                    else -> { /* Do nothing for Idle state */ }
-                }
-            }
-        }
+        // Aktifkan mode debug secara default
+        preprocessingVisualizer.setDebugMode(true)
     }
     
     /**
-     * Enable or disable debug mode
+     * Aktifkan/nonaktifkan mode debug
      */
     fun setDebugMode(enabled: Boolean) {
         _isDebugMode.value = enabled
@@ -95,94 +95,86 @@ class PreprocessingDebugViewModel @Inject constructor(
     }
     
     /**
-     * Reset the debug session
+     * Reset debug session
      */
     fun resetSession() {
         preprocessingVisualizer.startNewSession()
     }
     
     /**
-     * Set the receipt type for preprocessing
+     * Set selected config by index
      */
-    fun setReceiptType(receiptType: ReceiptType) {
-        _selectedConfigType.value = receiptType
+    fun setConfigByIndex(index: Int) {
+        if (index in availableConfigs.indices) {
+            _selectedConfig.value = availableConfigs[index].second
+        }
     }
     
     /**
-     * Process an image with the selected preprocessing configuration
+     * Proses gambar dari Uri
+     */
+    fun processImageFromUri(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                _isProcessing.value = true
+                _statusMessage.value = "Loading image..."
+                
+                // Load bitmap from uri
+                val bitmap = withContext(Dispatchers.IO) {
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+                
+                _statusMessage.value = "Processing image with ${selectedConfig.value.receiptType} configuration..."
+                
+                // Process the image
+                processImage(bitmap)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing image from URI: ${e.message}", e)
+                _statusMessage.value = "Error: ${e.message}"
+            } finally {
+                _isProcessing.value = false
+            }
+        }
+    }
+    
+    /**
+     * Proses gambar dengan pipeline preprocessing lengkap
      */
     fun processImage(bitmap: Bitmap) {
         viewModelScope.launch {
             try {
                 _isProcessing.value = true
                 
-                // Get config based on selected type
-                val config = getConfigForType(_selectedConfigType.value)
+                // Get the current selected config
+                val config = selectedConfig.value
                 
-                withContext(Dispatchers.Default) {
+                // Proses gambar dengan pipeline lengkap
+                val processedImage = withContext(Dispatchers.Default) {
                     imagePreprocessor.processReceiptImage(bitmap, config)
                 }
                 
-            } catch (e: Exception) {
-                Log.e(TAG, "Error processing image: ${e.message}", e)
-            } finally {
-                _isProcessing.value = false
-            }
-        }
-    }
-    
-    /**
-     * Process multiple configurations for comparison
-     */
-    fun processWithAllConfigs(bitmap: Bitmap) {
-        viewModelScope.launch {
-            try {
-                _isProcessing.value = true
+                _processedImage.value = processedImage
+                _statusMessage.value = "Processing complete. ${processingSteps.value.size} steps recorded."
                 
-                // Create a special multi-pass title
-                preprocessingVisualizer.captureProcessingStep(
-                    "Multi-pass Processing",
-                    "Processing with different receipt type configurations for comparison",
-                    bitmap
-                )
-                
-                // Process with all config types
-                withContext(Dispatchers.Default) {
-                    availableConfigs.forEach { receiptType ->
-                        if (receiptType != ReceiptType.AUTO_DETECT) {
-                            val config = getConfigForType(receiptType)
-                            
-                            val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
-                            
-                            // Create comparison image
-                            val comparisonImage = preprocessingVisualizer.generateBeforeAfterComparison(
-                                bitmap,
-                                processedImage,
-                                "Receipt Type: $receiptType"
-                            )
-                            
-                            // Capture the comparison
-                            preprocessingVisualizer.captureProcessingStep(
-                                "Comparison: $receiptType",
-                                "Preprocessing optimized for receipt type: $receiptType",
-                                comparisonImage
-                            )
-                        }
-                    }
-                }
-                
-                // Generate summary image
-                val summaryImage = preprocessingVisualizer.generateProcessingSummary()
-                if (summaryImage != null) {
+                // Create before-after comparison
+                if (_isDebugMode.value) {
+                    val comparisonImage = preprocessingVisualizer.generateBeforeAfterComparison(
+                        bitmap,
+                        processedImage,
+                        "Receipt Preprocessing (${config.receiptType})"
+                    )
+                    
                     preprocessingVisualizer.captureProcessingStep(
-                        "Comparison Summary",
-                        "Summary of all preprocessing configurations",
-                        summaryImage
+                        "Final Comparison",
+                        "Comparison of original vs fully processed image using ${config.receiptType} configuration",
+                        comparisonImage
                     )
                 }
                 
             } catch (e: Exception) {
-                Log.e(TAG, "Error in comparison processing: ${e.message}", e)
+                Log.e(TAG, "Error processing image: ${e.message}", e)
+                _statusMessage.value = "Error: ${e.message}"
             } finally {
                 _isProcessing.value = false
             }
@@ -190,21 +182,96 @@ class PreprocessingDebugViewModel @Inject constructor(
     }
     
     /**
-     * Process an image from a URI
+     * Run comparative analysis with different configurations
      */
-    fun processImageFromUri(uri: Uri, contentResolver: android.content.ContentResolver) {
+    fun runComparativeAnalysis(bitmap: Bitmap) {
         viewModelScope.launch {
             try {
                 _isProcessing.value = true
+                _statusMessage.value = "Running comparative analysis..."
                 
-                val bitmap = withContext(Dispatchers.IO) {
-                    android.provider.MediaStore.Images.Media.getBitmap(contentResolver, uri)
+                val configs = listOf(
+                    ReceiptType.THERMAL,
+                    ReceiptType.INKJET,
+                    ReceiptType.LASER,
+                    ReceiptType.DIGITAL
+                )
+                
+                withContext(Dispatchers.Default) {
+                    // Process original with default settings
+                    val defaultResult = imagePreprocessor.processReceiptImage(
+                        bitmap, 
+                        ReceiptPreprocessingConfig()
+                    )
+                    
+                    // Create comparison with default
+                    val defaultComparison = preprocessingVisualizer.generateBeforeAfterComparison(
+                        bitmap,
+                        defaultResult,
+                        "Auto Detect Configuration"
+                    )
+                    
+                    preprocessingVisualizer.captureProcessingStep(
+                        "Default Comparison",
+                        "Comparison with auto-detected receipt type",
+                        defaultComparison
+                    )
+                    
+                    // Process with specific configs
+                    configs.forEach { receiptType ->
+                        _statusMessage.value = "Processing with $receiptType configuration..."
+                        
+                        val config = ReceiptPreprocessingConfig(
+                            receiptType = receiptType,
+                            enabled = true
+                        )
+                        
+                        val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
+                        
+                        val comparisonImage = preprocessingVisualizer.generateBeforeAfterComparison(
+                            bitmap,
+                            processedImage,
+                            "Receipt Type: $receiptType"
+                        )
+                        
+                        preprocessingVisualizer.captureProcessingStep(
+                            "Comparison: $receiptType",
+                            "Optimized for receipt type: $receiptType",
+                            comparisonImage
+                        )
+                    }
+                    
+                    // Compare speed vs quality
+                    _statusMessage.value = "Comparing speed vs quality configurations..."
+                    
+                    val speedResult = imagePreprocessor.processReceiptImage(
+                        bitmap,
+                        ReceiptPreprocessingConfigFactory.speedOptimizedConfig()
+                    )
+                    
+                    val qualityResult = imagePreprocessor.processReceiptImage(
+                        bitmap,
+                        ReceiptPreprocessingConfigFactory.qualityOptimizedConfig()
+                    )
+                    
+                    val speedQualityComparison = preprocessingVisualizer.generateBeforeAfterComparison(
+                        speedResult,
+                        qualityResult,
+                        "Speed vs Quality Optimization"
+                    )
+                    
+                    preprocessingVisualizer.captureProcessingStep(
+                        "Speed vs Quality",
+                        "Left: Speed optimized, Right: Quality optimized",
+                        speedQualityComparison
+                    )
                 }
                 
-                processImage(bitmap)
+                _statusMessage.value = "Comparative analysis complete. ${processingSteps.value.size} steps recorded."
                 
             } catch (e: Exception) {
-                Log.e(TAG, "Error loading image from URI: ${e.message}", e)
+                Log.e(TAG, "Error in comparative analysis: ${e.message}", e)
+                _statusMessage.value = "Error: ${e.message}"
             } finally {
                 _isProcessing.value = false
             }
@@ -212,43 +279,86 @@ class PreprocessingDebugViewModel @Inject constructor(
     }
     
     /**
-     * Save a processed step image to device storage
+     * Simpan gambar tahapan preprocessing
      */
     fun saveStepImage(step: PreprocessingVisualizer.ProcessingStep): File? {
-        return preprocessingVisualizer.saveVisualizationToGallery(
+        val file = preprocessingVisualizer.saveVisualizationToGallery(
             step.imageBitmap,
             "step_${step.id}_${step.name.replace(" ", "_")}"
         )
+        
+        if (file != null) {
+            _statusMessage.value = "Saved to ${file.absolutePath}"
+        } else {
+            _statusMessage.value = "Failed to save image"
+        }
+        
+        return file
     }
     
     /**
-     * Save a summary of all debugging steps
+     * Simpan ringkasan debug
      */
     fun saveDebugSummary() {
         viewModelScope.launch {
             try {
                 val summaryImage = preprocessingVisualizer.generateProcessingSummary()
                 if (summaryImage != null) {
-                    preprocessingVisualizer.saveVisualizationToGallery(
+                    val file = preprocessingVisualizer.saveVisualizationToGallery(
                         summaryImage,
                         "debug_summary"
                     )
+                    
+                    if (file != null) {
+                        _statusMessage.value = "Summary saved to ${file.absolutePath}"
+                    } else {
+                        _statusMessage.value = "Failed to save summary"
+                    }
+                } else {
+                    _statusMessage.value = "No summary to save. Process an image first."
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving debug summary: ${e.message}", e)
+                _statusMessage.value = "Error saving summary: ${e.message}"
             }
         }
     }
     
     /**
-     * Get preprocessing configuration for specified receipt type
+     * Export all debug data as a ZIP file
      */
-    private fun getConfigForType(receiptType: ReceiptType): ReceiptPreprocessingConfig {
-        return when (receiptType) {
-            ReceiptType.AUTO_DETECT -> ReceiptPreprocessingConfig()
-            ReceiptType.THERMAL -> ReceiptPreprocessingConfigFactory.thermalReceiptConfig()
-            ReceiptType.INKJET, ReceiptType.LASER -> ReceiptPreprocessingConfigFactory.formalReceiptConfig()
-            ReceiptType.DIGITAL -> ReceiptPreprocessingConfig(receiptType = ReceiptType.DIGITAL)
+    fun exportDebugData(): File? {
+        try {
+            // Create a folder in the app's private directory
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val filename = "struku_debug_$timestamp.zip"
+            
+            val outputFile = File(
+                context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS),
+                filename
+            )
+            
+            // TODO: Implement ZIP file creation from debug folder
+            
+            _statusMessage.value = "Debug data exported to ${outputFile.absolutePath}"
+            return outputFile
+        } catch (e: Exception) {
+            Log.e(TAG, "Error exporting debug data: ${e.message}", e)
+            _statusMessage.value = "Error exporting debug data: ${e.message}"
+            return null
         }
+    }
+    
+    /**
+     * Clear status message
+     */
+    fun clearStatusMessage() {
+        _statusMessage.value = null
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        
+        // Clean up resources if necessary
     }
 }

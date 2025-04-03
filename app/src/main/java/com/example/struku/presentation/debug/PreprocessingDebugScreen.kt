@@ -46,7 +46,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +57,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,7 +65,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.struku.data.ocr.PreprocessingVisualizer
-import java.io.File
+import com.example.struku.presentation.components.PreprocessingVisualizer as PreprocessingVisualizerComponent
+import com.example.struku.presentation.components.ProcessingStep
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -85,6 +84,8 @@ fun PreprocessingDebugScreen(
     val processingSteps by viewModel.processingSteps.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val isDebugMode by viewModel.isDebugMode.collectAsState()
+    val currentImage by viewModel.currentImage.collectAsState()
+    val currentProcessingStep by viewModel.currentProcessingStep.collectAsState()
     
     var selectedStep by remember { mutableStateOf<PreprocessingVisualizer.ProcessingStep?>(null) }
     
@@ -130,14 +131,12 @@ fun PreprocessingDebugScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Test image selector
-            TestImageSelector(
-                onImageSelected = { bitmap ->
-                    viewModel.processImage(bitmap)
-                },
-                onProcessComparisons = { bitmap ->
-                    viewModel.processComparisons(bitmap)
-                }
+            // Visualizer component
+            PreprocessingVisualizerComponent(
+                image = currentImage,
+                currentStep = currentProcessingStep,
+                onStepSelected = { viewModel.setCurrentProcessingStep(it) },
+                modifier = Modifier.padding(16.dp)
             )
             
             Divider(modifier = Modifier.padding(vertical = 16.dp))

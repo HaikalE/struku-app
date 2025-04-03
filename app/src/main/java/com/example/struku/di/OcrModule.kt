@@ -23,10 +23,14 @@ object OcrModule {
     @Provides
     @Singleton
     fun providePreprocessingVisualizer(@ApplicationContext context: Context): PreprocessingVisualizer {
+        // Initialize with default settings
+        // Debug mode will be controlled by the specific screens that need it
         val visualizer = PreprocessingVisualizer(context)
-        // Initialize with optimized settings
-        visualizer.setDebugMode(false) // Disable debug mode by default
-        visualizer.setSamplingRate(3) // Only capture every 3rd step to reduce overhead
+        
+        // Default to debug mode OFF in non-debug contexts for better performance
+        visualizer.setDebugMode(false)
+        
+        // When debug mode is enabled later, sampling rate will be set to 1 automatically
         return visualizer
     }
 

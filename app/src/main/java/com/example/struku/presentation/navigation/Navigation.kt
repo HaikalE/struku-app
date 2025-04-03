@@ -1,6 +1,7 @@
 package com.example.struku.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -14,10 +15,14 @@ import com.example.struku.presentation.analytics.ManageCategoriesScreen
  * Main navigation configuration for the app
  */
 @Composable
-fun Navigation(navController: NavHostController) {
+fun Navigation(
+    navController: NavHostController,
+    modifier: Modifier = Modifier
+) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Analytics.route
+        startDestination = Screen.Analytics.route,
+        modifier = modifier
     ) {
         // Analytics screen
         composable(route = Screen.Analytics.route) {
@@ -60,7 +65,21 @@ fun Navigation(navController: NavHostController) {
             )
         }
         
-        // Add other screens here as needed
+        // Placeholder screens for other main tabs
+        composable(route = "home") {
+            // Home screen placeholder
+            // HomeScreen()
+        }
+        
+        composable(route = "scanner") {
+            // Scanner screen placeholder
+            // ScannerScreen()
+        }
+        
+        composable(route = "profile") {
+            // Profile screen placeholder
+            // ProfileScreen()
+        }
     }
 }
 

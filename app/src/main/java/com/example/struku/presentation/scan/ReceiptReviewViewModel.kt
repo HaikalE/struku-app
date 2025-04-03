@@ -1,5 +1,6 @@
 package com.example.struku.presentation.scan
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.struku.domain.model.Category
@@ -20,7 +21,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ReceiptReviewViewModel @Inject constructor(
     private val receiptRepository: ReceiptRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReceiptReviewState())
@@ -28,6 +30,13 @@ class ReceiptReviewViewModel @Inject constructor(
     
     init {
         loadCategories()
+        
+        // Check if we have a receiptId in the saved state handle
+        savedStateHandle.get<Long>("receiptId")?.let { receiptId ->
+            if (receiptId > 0) {
+                loadReceipt(receiptId)
+            }
+        }
     }
     
     private fun loadCategories() {

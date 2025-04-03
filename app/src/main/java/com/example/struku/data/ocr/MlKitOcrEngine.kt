@@ -1,14 +1,13 @@
 package com.example.struku.data.ocr
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,149 +15,124 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * Implementasi OCR menggunakan Google ML Kit dengan advanced preprocessing
+ * OCR Engine using ML Kit's text recognition
  */
 @Singleton
 class MlKitOcrEngine @Inject constructor(
-    private val imagePreprocessor: AdvancedImagePreprocessor
+    @ApplicationContext private val context: Context
 ) {
-    private val recognizer: TextRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    private val TAG = "MlKitOcrEngine"
     
-    // Status OCR
-    private val _ocrState = MutableStateFlow<OcrState>(OcrState.Idle)
-    val ocrState: StateFlow<OcrState> = _ocrState.asStateFlow()
-    
-    /**
-     * State untuk pelacakan proses OCR
-     */
-    sealed class OcrState {
-        object Idle : OcrState()
-        class InProgress(val stage: String, val progress: Float) : OcrState()
-        class Success(val text: Text) : OcrState()
-        class Error(val message: String, val exception: Exception? = null) : OcrState()
-    }
+    // Create text recognizer
+    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     
     /**
-     * Menggunakan ML Kit untuk mengenali teks dari gambar dengan preprocessing
-     * @param image Gambar untuk OCR
-     * @param config Konfigurasi pre-processing
-     * @return Objek Text dari ML Kit yang berisi hasil OCR
+     * Recognize text in an image
+     *
+     * @param bitmap Image to process
+     * @return Raw recognized text
      */
-    suspend fun recognizeText(
-        image: Bitmap,
-        config: ReceiptPreprocessingConfig = ReceiptPreprocessingConfig()
-    ): Text {
+    suspend fun recognizeText(bitmap: Bitmap): String = suspendCancellableCoroutine { continuation ->
         try {
-            _ocrState.value = OcrState.InProgress("Preprocessing image", 0.0f)
+            // Create input image
+            val image = InputImage.fromBitmap(bitmap, 0)
             
-            // 1. Pre-process gambar
-            val preprocessedImage = if (config.enabled) {
-                imagePreprocessor.processReceiptImage(image, config)
-            } else {
-                image
+            // Process image
+            recognizer.process(image)
+                .addOnSuccessListener { visionText ->
+                    val text = processVisionText(visionText)
+                    continuation.resume(text)
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Text recognition failed: ${e.message}", e)
+                    continuation.resumeWithException(e)
+                }
+                
+            continuation.invokeOnCancellation {
+                // No cleanup needed here
             }
-            
-            // 2. Lakukan OCR
-            _ocrState.value = OcrState.InProgress("Performing OCR", 0.5f)
-            val result = performOcr(preprocessedImage)
-            
-            _ocrState.value = OcrState.Success(result)
-            return result
-            
         } catch (e: Exception) {
-            _ocrState.value = OcrState.Error("OCR failed: ${e.message}", e)
-            throw e
+            Log.e(TAG, "Error processing image: ${e.message}", e)
+            continuation.resumeWithException(e)
         }
     }
     
     /**
-     * Melakukan OCR dengan ML Kit
+     * Process detected text from ML Kit
      */
-    private suspend fun performOcr(image: Bitmap): Text = suspendCancellableCoroutine { continuation ->
-        val inputImage = InputImage.fromBitmap(image, 0)
+    private fun processVisionText(visionText: Text): String {
+        val builder = StringBuilder()
         
-        recognizer.process(inputImage)
-            .addOnSuccessListener { text ->
-                continuation.resume(text)
-            }
-            .addOnFailureListener { exception ->
-                continuation.resumeWithException(exception)
+        // Process each text block
+        for (block in visionText.textBlocks) {
+            // Process each line
+            for (line in block.lines) {
+                builder.append(line.text).append("\n")
             }
             
-        continuation.invokeOnCancellation {
-            // No-op, ML Kit doesn't provide cancellation API
+            // Add extra space between blocks for better readability
+            builder.append("\n")
+        }
+        
+        return builder.toString().trim()
+    }
+    
+    /**
+     * Extract text blocks for detailed processing
+     */
+    suspend fun extractTextBlocks(bitmap: Bitmap): List<TextBlock> = suspendCancellableCoroutine { continuation ->
+        try {
+            // Create input image
+            val image = InputImage.fromBitmap(bitmap, 0)
+            
+            // Process image
+            recognizer.process(image)
+                .addOnSuccessListener { visionText ->
+                    val textBlocks = mapVisionTextToBlocks(visionText)
+                    continuation.resume(textBlocks)
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Text block extraction failed: ${e.message}", e)
+                    continuation.resumeWithException(e)
+                }
+                
+            continuation.invokeOnCancellation {
+                // No cleanup needed here
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing image for text blocks: ${e.message}", e)
+            continuation.resumeWithException(e)
         }
     }
     
     /**
-     * Convenience method that returns raw text string instead of Text object
+     * Map ML Kit vision text to our domain models
      */
-    suspend fun recognizeTextAsString(
-        image: Bitmap,
-        config: ReceiptPreprocessingConfig = ReceiptPreprocessingConfig()
-    ): String {
-        return recognizeText(image, config).text
-    }
-    
-    /**
-     * Get structured text blocks with position information
-     */
-    suspend fun getTextBlocks(
-        image: Bitmap,
-        config: ReceiptPreprocessingConfig = ReceiptPreprocessingConfig()
-    ): List<TextBlock> {
-        val text = recognizeText(image, config)
-        return text.textBlocks.map { block ->
+    private fun mapVisionTextToBlocks(visionText: Text): List<TextBlock> {
+        return visionText.textBlocks.map { block ->
+            val lines = block.lines.map { line ->
+                val elements = line.elements.map { element ->
+                    TextElement(
+                        text = element.text,
+                        boundingBox = element.boundingBox,
+                        cornerPoints = element.cornerPoints
+                    )
+                }
+                
+                TextLine(
+                    text = line.text,
+                    boundingBox = line.boundingBox,
+                    cornerPoints = line.cornerPoints,
+                    elements = elements
+                )
+            }
+            
             TextBlock(
                 text = block.text,
                 boundingBox = block.boundingBox,
                 cornerPoints = block.cornerPoints,
-                lines = block.lines.map { line ->
-                    TextLine(
-                        text = line.text,
-                        boundingBox = line.boundingBox,
-                        cornerPoints = line.cornerPoints,
-                        elements = line.elements.map { element ->
-                            TextElement(
-                                text = element.text,
-                                boundingBox = element.boundingBox,
-                                cornerPoints = element.cornerPoints
-                            )
-                        }
-                    )
-                }
+                lines = lines
             )
         }
-    }
-    
-    /**
-     * Mengenali teks dengan optimasi terbaik untuk jenis struk tertentu
-     */
-    suspend fun recognizeTextOptimizedFor(
-        image: Bitmap,
-        receiptType: ReceiptType
-    ): Text {
-        val config = when (receiptType) {
-            ReceiptType.THERMAL -> ReceiptPreprocessingConfigFactory.thermalReceiptConfig()
-            ReceiptType.INKJET, ReceiptType.LASER -> ReceiptPreprocessingConfigFactory.formalReceiptConfig()
-            ReceiptType.DIGITAL -> ReceiptPreprocessingConfig(receiptType = ReceiptType.DIGITAL)
-            else -> ReceiptPreprocessingConfig() // Auto-detect
-        }
-        
-        return recognizeText(image, config)
-    }
-    
-    /**
-     * Mengenali teks dengan optimasi kecepatan
-     */
-    suspend fun recognizeTextFast(image: Bitmap): Text {
-        return recognizeText(image, ReceiptPreprocessingConfigFactory.speedOptimizedConfig())
-    }
-    
-    /**
-     * Mengenali teks dengan optimasi kualitas maksimum (lebih lambat)
-     */
-    suspend fun recognizeTextHighQuality(image: Bitmap): Text {
-        return recognizeText(image, ReceiptPreprocessingConfigFactory.qualityOptimizedConfig())
     }
 }

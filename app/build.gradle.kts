@@ -21,6 +21,11 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        
+        // Force app to use OpenGL ES 3.0 or higher for GPU workloads
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     buildTypes {
@@ -31,11 +36,16 @@ android {
                 "proguard-rules.pro"
             )
         }
+        debug {
+            isMinifyEnabled = false
+            isDebuggable = true
+        }
     }
     
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
     
     kotlinOptions {
@@ -44,31 +54,42 @@ android {
     
     buildFeatures {
         compose = true
-        viewBinding = true  // Add view binding support
+        viewBinding = true
     }
     
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.4" // Kompatibel dengan Kotlin 1.9.20
+        kotlinCompilerExtensionVersion = "1.5.4"
     }
     
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+            excludes += "META-INF/DEPENDENCIES"
+            // Exclude native libraries that might conflict
+            pickFirsts += "**/*.so"
+        }
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
 
 dependencies {
-    // AndroidX Core
+    // Core Android libraries
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.activity:activity-compose:1.8.0")
+    
+    // Desugaring for compatibility with newer Java features on older Android versions
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
     
     // ConstraintLayout - Added for XML layouts
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.appcompat:appcompat:1.6.1")
     
-    // Compose - Gunakan versi BOM yang stabil
+    // Compose - Use stable BOM version
     implementation(platform("androidx.compose:compose-bom:2023.08.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -82,26 +103,41 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.0")
     implementation("androidx.camera:camera-view:1.3.0")
     
-    // ML Kit for OCR
+    // ML Kit for OCR with proper dependency resolution
     implementation("com.google.mlkit:text-recognition:16.0.0")
     
     // ML Kit document scanner
-    implementation("com.google.mlkit:document-scanner:16.0.0")
+    implementation("com.google.mlkit:document-scanner:16.0.0") {
+        exclude(group = "org.tensorflow", module = "tensorflow-lite")
+        exclude(group = "org.tensorflow", module = "tensorflow-lite-api")
+    }
     
-    // OpenCV for advanced image processing
-    implementation("org.opencv:opencv-android:4.8.0")
+    // OpenCV for advanced image processing - using a more stable distribution
+    implementation("org.opencv:opencv-android:4.8.0") {
+        exclude(group = "com.android.support", module = "*") // Exclude legacy support libraries
+    }
     
-    // TensorFlow Lite for ML-based image enhancement
-    implementation("org.tensorflow:tensorflow-lite:2.13.0")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.13.0")
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.13.0")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    // TensorFlow Lite with proper dependency management
+    implementation("org.tensorflow:tensorflow-lite:2.13.0") {
+        exclude(group = "io.netty")
+        exclude(group = "com.google.protobuf")
+    }
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.13.0") {
+        exclude(group = "io.netty")
+    }
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4") {
+        exclude(group = "io.netty")
+        exclude(group = "com.google.protobuf")
+    }
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.13.0") {
+        exclude(group = "io.netty")
+    }
     
     // Image processing libraries
     implementation("jp.co.cyberagent.android:gpuimage:2.1.0") // GPU-accelerated image processing
     implementation("com.github.bumptech.glide:glide:4.16.0")  // For image loading and caching
     
-    // Room for database
+    // Room for database with proper KSP configuration
     implementation("androidx.room:room-runtime:2.6.0")
     implementation("androidx.room:room-ktx:2.6.0")
     ksp("androidx.room:room-compiler:2.6.0")

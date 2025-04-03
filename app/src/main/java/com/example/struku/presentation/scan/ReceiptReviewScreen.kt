@@ -81,7 +81,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiptReviewScreen(
-    receiptId: Long,
     navController: NavController,
     viewModel: ReceiptReviewViewModel = hiltViewModel()
 ) {
@@ -92,9 +91,13 @@ fun ReceiptReviewScreen(
     // Variable untuk menampilkan dialog setelah save berhasil
     var showSavedDialog by remember { mutableStateOf(false) }
     
-    // Load receipt data
-    LaunchedEffect(receiptId) {
-        viewModel.loadReceipt(receiptId)
+    // Load receipt data from saved state
+    LaunchedEffect(Unit) {
+        // Note: We'll get the receipt ID from the navigation arguments or state
+        val receiptId = viewModel.state.value.savedReceiptId ?: 0L
+        if (receiptId > 0) {
+            viewModel.loadReceipt(receiptId)
+        }
     }
     
     // Process save completion

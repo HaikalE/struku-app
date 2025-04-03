@@ -114,8 +114,8 @@ dependencies {
     // implementation("com.google.mlkit:document-scanner:16.0.0")
     
     // OpenCV for advanced image processing
-    // Use an alternative Java-based OpenCV library instead
-    implementation("org.openpnp:opencv:4.5.1-2")
+    // Replace OpenPnP with official OpenCV Android SDK
+    implementation("org.opencv:opencv-android:4.9.0")
     
     // TensorFlow Lite with proper dependency management
     implementation("org.tensorflow:tensorflow-lite:2.13.0") {

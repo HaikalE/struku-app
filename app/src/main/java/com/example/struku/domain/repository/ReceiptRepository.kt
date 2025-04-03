@@ -20,6 +20,16 @@ interface ReceiptRepository {
     suspend fun getReceipt(id: Long): Receipt?
     
     /**
+     * Get receipt by ID (alternate method name)
+     */
+    suspend fun getReceiptById(id: Long): Receipt?
+    
+    /**
+     * Get all receipts (alternate method name)
+     */
+    fun getAllReceipts(): Flow<List<Receipt>>
+    
+    /**
      * Insert a new receipt
      * @return ID of the inserted receipt
      */
@@ -34,6 +44,11 @@ interface ReceiptRepository {
      * Delete a receipt
      */
     suspend fun deleteReceipt(receipt: Receipt)
+    
+    /**
+     * Delete a receipt by ID
+     */
+    suspend fun deleteReceipt(id: Long)
     
     /**
      * Get all line items for a receipt

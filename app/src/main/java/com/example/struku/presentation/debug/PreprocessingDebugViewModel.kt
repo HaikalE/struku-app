@@ -1,239 +1,136 @@
 package com.example.struku.presentation.debug
 
 import android.graphics.Bitmap
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.struku.data.ocr.AdvancedImagePreprocessor
-import com.example.struku.data.ocr.PreprocessingLevel
 import com.example.struku.data.ocr.PreprocessingVisualizer
-import com.example.struku.data.ocr.ReceiptPreprocessingConfig
-import com.example.struku.data.ocr.ReceiptPreprocessingConfigFactory
-import com.example.struku.data.ocr.ReceiptType
+import com.example.struku.presentation.components.ProcessingStep
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 
-/**
- * ViewModel for debugging preprocessing pipeline
- */
 @HiltViewModel
 class PreprocessingDebugViewModel @Inject constructor(
-    private val imagePreprocessor: AdvancedImagePreprocessor,
-    private val preprocessingVisualizer: PreprocessingVisualizer
+    private val visualizer: PreprocessingVisualizer
 ) : ViewModel() {
+
+    // State flows for UI state
+    private val _processingSteps = MutableStateFlow<List<PreprocessingVisualizer.ProcessingStep>>(emptyList())
+    val processingSteps: StateFlow<List<PreprocessingVisualizer.ProcessingStep>> = _processingSteps.asStateFlow()
     
-    private val TAG = "PreprocessingDebugVM"
-    
-    // Current status
     private val _isProcessing = MutableStateFlow(false)
-    val isProcessing = _isProcessing.asStateFlow()
+    val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
     
-    // Debug mode
     private val _isDebugMode = MutableStateFlow(true)
-    val isDebugMode = _isDebugMode.asStateFlow()
+    val isDebugMode: StateFlow<Boolean> = _isDebugMode.asStateFlow()
     
-    // Preprocessing steps from visualizer
-    val processingSteps = preprocessingVisualizer.processingSteps
-        .stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            emptyList()
-        )
+    private val _currentImage = MutableStateFlow<Bitmap?>(null)
+    val currentImage: StateFlow<Bitmap?> = _currentImage.asStateFlow()
     
-    // Last processed image
-    private val _processedImage = MutableStateFlow<Bitmap?>(null)
-    val processedImage = _processedImage.asStateFlow()
+    private val _currentProcessingStep = MutableStateFlow(ProcessingStep.ORIGINAL)
+    val currentProcessingStep: StateFlow<ProcessingStep> = _currentProcessingStep.asStateFlow()
     
     init {
-        // Enable debug mode by default
-        preprocessingVisualizer.setDebugMode(true)
+        // Initialize visualizer in debug mode
+        visualizer.setDebugMode(true)
+        refreshProcessingSteps()
     }
     
     /**
-     * Enable/disable debug mode
+     * Process an image with the visualizer
      */
-    fun setDebugMode(enabled: Boolean) {
-        _isDebugMode.value = enabled
-        preprocessingVisualizer.setDebugMode(enabled)
-    }
-    
-    /**
-     * Reset debug session
-     */
-    fun resetSession() {
-        preprocessingVisualizer.startNewSession()
-    }
-    
-    /**
-     * Process image with full preprocessing pipeline
-     */
-    fun processImage(bitmap: Bitmap, config: ReceiptPreprocessingConfig? = null) {
+    fun processImage(bitmap: Bitmap) {
         viewModelScope.launch {
-            try {
-                _isProcessing.value = true
-                
-                val effectiveConfig = config ?: ReceiptPreprocessingConfig(
-                    receiptType = ReceiptType.AUTO_DETECT,
-                    preprocessingLevel = PreprocessingLevel.ADVANCED,
-                    enabled = true
-                )
-                
-                // Process image with full pipeline
-                val processedImage = withContext(Dispatchers.Default) {
-                    imagePreprocessor.processReceiptImage(bitmap, effectiveConfig)
-                }
-                
-                _processedImage.value = processedImage
-                
-                // Create before-after comparison
-                if (_isDebugMode.value) {
-                    val comparisonImage = preprocessingVisualizer.generateBeforeAfterComparison(
-                        bitmap,
-                        processedImage,
-                        "Receipt Preprocessing"
-                    )
-                    
-                    preprocessingVisualizer.captureProcessingStep(
-                        "Final Comparison",
-                        "Comparison of original vs fully processed image",
-                        comparisonImage
-                    )
-                }
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error processing image: ${e.message}", e)
-            } finally {
-                _isProcessing.value = false
-            }
+            _isProcessing.value = true
+            
+            // Reset visualizer and store original image
+            visualizer.startNewSession()
+            _currentImage.value = bitmap
+            
+            // TODO: Implement actual processing logic here
+            
+            _isProcessing.value = false
+            refreshProcessingSteps()
         }
     }
     
     /**
-     * Save preprocessing step image
-     */
-    fun saveStepImage(step: PreprocessingVisualizer.ProcessingStep): File? {
-        return preprocessingVisualizer.saveVisualizationToGallery(
-            step.imageBitmap,
-            "step_${step.id}_${step.name.replace(" ", "_")}"
-        )
-    }
-    
-    /**
-     * Save debug summary
-     */
-    fun saveDebugSummary() {
-        viewModelScope.launch {
-            try {
-                val summaryImage = preprocessingVisualizer.generateProcessingSummary()
-                if (summaryImage != null) {
-                    preprocessingVisualizer.saveVisualizationToGallery(
-                        summaryImage,
-                        "debug_summary"
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error saving debug summary: ${e.message}", e)
-            }
-        }
-    }
-    
-    /**
-     * Process image with various configurations for comparison
+     * Process image with different comparison settings
      */
     fun processComparisons(bitmap: Bitmap) {
         viewModelScope.launch {
-            try {
-                _isProcessing.value = true
-                
-                // Reset session to start with clean slate
-                resetSession()
-                
-                // Original image
-                preprocessingVisualizer.captureProcessingStep(
-                    "Original Input", 
-                    "Raw input image",
-                    bitmap
-                )
-                
-                // Run different processing configs in parallel
-                val configs = listOf(
-                    ReceiptPreprocessingConfigFactory.createConfig(
-                        receiptType = ReceiptType.AUTO_DETECT,
-                        preprocessingLevel = PreprocessingLevel.BASIC
-                    ),
-                    ReceiptPreprocessingConfigFactory.createConfig(
-                        receiptType = ReceiptType.AUTO_DETECT,
-                        preprocessingLevel = PreprocessingLevel.MAXIMUM
-                    ),
-                    ReceiptPreprocessingConfigFactory.createConfig(
-                        receiptType = ReceiptType.THERMAL,
-                        preprocessingLevel = PreprocessingLevel.ADVANCED
-                    ),
-                    ReceiptPreprocessingConfigFactory.createConfig(
-                        receiptType = ReceiptType.INKJET,
-                        preprocessingLevel = PreprocessingLevel.ADVANCED
-                    )
-                )
-                
-                for (config in configs) {
-                    processWithConfig(bitmap, config)
-                }
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error in comparison processing: ${e.message}", e)
-            } finally {
-                _isProcessing.value = false
+            _isProcessing.value = true
+            
+            // Reset visualizer
+            visualizer.startNewSession()
+            _currentImage.value = bitmap
+            
+            // TODO: Implement comparison processing logic
+            
+            _isProcessing.value = false
+            refreshProcessingSteps()
+        }
+    }
+    
+    /**
+     * Set current processing step
+     */
+    fun setCurrentProcessingStep(step: ProcessingStep) {
+        _currentProcessingStep.value = step
+    }
+    
+    /**
+     * Toggle debug mode
+     */
+    fun setDebugMode(enabled: Boolean) {
+        _isDebugMode.value = enabled
+        visualizer.setDebugMode(enabled)
+    }
+    
+    /**
+     * Reset the debug session
+     */
+    fun resetSession() {
+        viewModelScope.launch {
+            visualizer.startNewSession()
+            _currentImage.value = null
+            _currentProcessingStep.value = ProcessingStep.ORIGINAL
+            refreshProcessingSteps()
+        }
+    }
+    
+    /**
+     * Save a processing step image
+     */
+    fun saveStepImage(step: PreprocessingVisualizer.ProcessingStep) {
+        viewModelScope.launch {
+            val fileName = "struku_step_${step.id}_${step.name.replace(" ", "_").lowercase()}"
+            visualizer.saveVisualizationToGallery(step.imageBitmap, fileName)
+            // TODO: Show success message
+        }
+    }
+    
+    /**
+     * Save a summary of all processing steps
+     */
+    fun saveDebugSummary() {
+        viewModelScope.launch {
+            val summaryImage = visualizer.generateProcessingSummary()
+            if (summaryImage != null) {
+                val fileName = "struku_summary_${System.currentTimeMillis()}"
+                visualizer.saveVisualizationToGallery(summaryImage, fileName)
+                // TODO: Show success message
             }
         }
     }
     
     /**
-     * Process image with specific configuration
+     * Refresh the processing steps from the visualizer
      */
-    private suspend fun processWithConfig(bitmap: Bitmap, config: ReceiptPreprocessingConfig) {
-        try {
-            val configName = when (config.receiptType) {
-                ReceiptType.THERMAL -> "Thermal Receipt"
-                ReceiptType.INKJET -> "Inkjet Receipt"
-                ReceiptType.LASER -> "Laser Receipt"
-                ReceiptType.DIGITAL -> "Digital Receipt"
-                ReceiptType.AUTO_DETECT -> {
-                    when (config.preprocessingLevel) {
-                        PreprocessingLevel.BASIC -> "Speed Optimized"
-                        PreprocessingLevel.MAXIMUM -> "Quality Optimized"
-                        PreprocessingLevel.ADVANCED -> "Auto Detect"
-                    }
-                }
-            }
-            
-            val processedImage = withContext(Dispatchers.Default) {
-                imagePreprocessor.processReceiptImage(bitmap, config)
-            }
-            
-            // Create comparison
-            val comparisonImage = preprocessingVisualizer.generateBeforeAfterComparison(
-                bitmap,
-                processedImage,
-                "Config: $configName"
-            )
-            
-            preprocessingVisualizer.captureProcessingStep(
-                "Config: $configName",
-                "Processing with ${config.receiptType} configuration at ${config.preprocessingLevel} level",
-                comparisonImage
-            )
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error processing with config ${config.receiptType}: ${e.message}", e)
-        }
+    private fun refreshProcessingSteps() {
+        _processingSteps.value = visualizer.processingSteps
     }
 }

@@ -18,8 +18,10 @@ object OcrModule {
 
     @Provides
     @Singleton
-    fun providePreprocessingVisualizer(): PreprocessingVisualizer {
-        return PreprocessingVisualizer()
+    fun providePreprocessingVisualizer(
+        @ApplicationContext context: Context
+    ): PreprocessingVisualizer {
+        return PreprocessingVisualizer(context)
     }
 
     @Provides
@@ -33,8 +35,11 @@ object OcrModule {
 
     @Provides
     @Singleton
-    fun provideMlKitOcrEngine(imagePreprocessor: AdvancedImagePreprocessor): MlKitOcrEngine {
-        return MlKitOcrEngine(imagePreprocessor)
+    fun provideMlKitOcrEngine(
+        @ApplicationContext context: Context,
+        imagePreprocessor: AdvancedImagePreprocessor
+    ): MlKitOcrEngine {
+        return MlKitOcrEngine(context, imagePreprocessor)
     }
 
     @Provides

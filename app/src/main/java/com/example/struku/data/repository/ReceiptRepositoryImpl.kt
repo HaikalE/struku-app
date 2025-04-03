@@ -1,82 +1,129 @@
 package com.example.struku.data.repository
 
+import com.example.struku.data.local.dao.ReceiptDao
+import com.example.struku.data.local.entity.LineItemEntity
+import com.example.struku.data.mapper.ReceiptMapper
+import com.example.struku.domain.model.LineItem
 import com.example.struku.domain.model.Receipt
 import com.example.struku.domain.repository.ReceiptRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Implementasi dari ReceiptRepository
- * 
- * Untuk saat ini, implementasi ini masih menggunakan data dummy
- * Kedepannya akan diganti dengan implementasi yang menggunakan Room Database
+ * Implementation of the ReceiptRepository interface
  */
 @Singleton
-class ReceiptRepositoryImpl @Inject constructor() : ReceiptRepository {
+class ReceiptRepositoryImpl @Inject constructor(
+    private val receiptDao: ReceiptDao,
+    private val mapper: ReceiptMapper
+) : ReceiptRepository {
     
-    // List untuk menyimpan struk sementara (sebagai pengganti database)
-    private val receipts = mutableListOf<Receipt>()
+    override fun getReceipts(): Flow<List<Receipt>> {
+        return receiptDao.getAllReceiptsWithItems().map { list -> 
+            list.map { mapper.mapToDomain(it) }
+        }
+    }
     
-    // Counter untuk ID
-    private var idCounter = 1L
+    override suspend fun getReceipt(id: Long): Receipt? {
+        val receiptWithItems = receiptDao.getReceiptWithItems(id)
+        return receiptWithItems?.let { mapper.mapToDomain(it) }
+    }
     
-    override suspend fun saveReceipt(receipt: Receipt): Long {
-        val id = idCounter++
-        val newReceipt = receipt.copy(id = id)
-        receipts.add(newReceipt)
-        return id
+    override suspend fun insertReceipt(receipt: Receipt): Long {
+        val receiptEntity = mapper.mapToEntity(receipt)
+        val receiptId = receiptDao.insertReceipt(receiptEntity)
+        
+        // Insert all line items with the new receipt ID
+        receipt.items.forEach { item ->
+            val itemEntity = mapper.mapLineItemToEntity(item, receiptId)
+            receiptDao.insertLineItem(itemEntity)
+        }
+        
+        return receiptId
     }
     
     override suspend fun updateReceipt(receipt: Receipt) {
-        val index = receipts.indexOfFirst { it.id == receipt.id }
-        if (index != -1) {
-            receipts[index] = receipt.copy(updatedAt = Date())
+        val receiptEntity = mapper.mapToEntity(receipt)
+        receiptDao.updateReceipt(receiptEntity)
+        
+        // Handle line items - first delete existing items
+        receiptDao.deleteLineItemsByReceiptId(receipt.id)
+        
+        // Then insert the updated items
+        receipt.items.forEach { item ->
+            val itemEntity = mapper.mapLineItemToEntity(item, receipt.id)
+            receiptDao.insertLineItem(itemEntity)
         }
     }
     
-    override suspend fun deleteReceipt(receiptId: Long) {
-        receipts.removeIf { it.id == receiptId }
+    override suspend fun deleteReceipt(receipt: Receipt) {
+        val receiptEntity = mapper.mapToEntity(receipt)
+        receiptDao.deleteReceipt(receiptEntity)
+        // Line items will be deleted by Room's cascading delete
     }
     
-    override suspend fun getReceiptById(receiptId: Long): Receipt? {
-        return receipts.find { it.id == receiptId }
+    override suspend fun getLineItems(receiptId: Long): List<LineItem> {
+        return receiptDao.getLineItemsForReceipt(receiptId).map { 
+            mapper.mapLineItemToDomain(it) 
+        }
     }
     
-    override fun getAllReceipts(): Flow<List<Receipt>> {
-        return flowOf(receipts.sortedByDescending { it.date })
+    override suspend fun insertLineItem(lineItem: LineItem): Long {
+        val lineItemEntity = mapper.mapLineItemToEntity(lineItem, lineItem.id)
+        return receiptDao.insertLineItem(lineItemEntity)
     }
     
-    override fun getReceiptsByDateRange(startDate: Date, endDate: Date): Flow<List<Receipt>> {
-        return flowOf(receipts.filter { 
-            it.date.time >= startDate.time && it.date.time <= endDate.time 
-        }.sortedByDescending { it.date })
+    override suspend fun updateLineItem(lineItem: LineItem) {
+        val lineItemEntity = mapper.mapLineItemToEntity(lineItem, lineItem.id)
+        receiptDao.updateLineItem(lineItemEntity)
+    }
+    
+    override suspend fun deleteLineItem(lineItem: LineItem) {
+        val lineItemEntity = LineItemEntity(
+            id = lineItem.id,
+            receiptId = 0, // This will be ignored during deletion
+            name = lineItem.name,
+            price = lineItem.price,
+            quantity = lineItem.quantity,
+            total = lineItem.price * lineItem.quantity,
+            category = lineItem.category,
+            notes = lineItem.notes
+        )
+        receiptDao.deleteLineItem(lineItemEntity)
     }
     
     override fun getReceiptsByCategory(category: String): Flow<List<Receipt>> {
-        return flowOf(receipts.filter { 
-            it.category.equals(category, ignoreCase = true) 
-        }.sortedByDescending { it.date })
+        return receiptDao.getReceiptsByCategory(category).map { list ->
+            list.map { mapper.mapToDomain(it) }
+        }
     }
     
-    override suspend fun getTotalByCategory(startDate: Date, endDate: Date): Map<String, Double> {
-        val filteredReceipts = receipts.filter { 
-            it.date.time >= startDate.time && it.date.time <= endDate.time 
+    override fun getReceiptsByDateRange(startDate: Long, endDate: Long): Flow<List<Receipt>> {
+        return receiptDao.getReceiptsByDateRange(startDate, endDate).map { list ->
+            list.map { mapper.mapToDomain(it) }
         }
-        
-        return filteredReceipts.groupBy { it.category }
-            .mapValues { (_, receipts) -> receipts.sumOf { it.total } }
     }
     
-    override suspend fun getTotalByMonth(startDate: Date, endDate: Date): Map<String, Double> {
-        val dateFormat = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.getDefault())
-        val filteredReceipts = receipts.filter { 
-            it.date.time >= startDate.time && it.date.time <= endDate.time 
+    override fun getReceiptsByMerchant(merchantName: String): Flow<List<Receipt>> {
+        return receiptDao.getReceiptsByMerchant(merchantName).map { list ->
+            list.map { mapper.mapToDomain(it) }
         }
-        
-        return filteredReceipts.groupBy { dateFormat.format(it.date) }
-            .mapValues { (_, receipts) -> receipts.sumOf { it.total } }
+    }
+    
+    override fun searchReceipts(query: String): Flow<List<Receipt>> {
+        return receiptDao.searchReceipts("%$query%").map { list ->
+            list.map { mapper.mapToDomain(it) }
+        }
+    }
+    
+    override fun getTotalByCategory(): Flow<Map<String, Double>> {
+        return receiptDao.getTotalByCategory()
+    }
+    
+    override fun getTotalByMonth(): Flow<Map<String, Double>> {
+        return receiptDao.getTotalByMonth()
     }
 }

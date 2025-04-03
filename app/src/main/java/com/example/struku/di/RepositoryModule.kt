@@ -1,14 +1,19 @@
 package com.example.struku.di
 
 import android.content.Context
+import com.example.struku.data.local.dao.BudgetDao
+import com.example.struku.data.local.dao.CategoryDao
 import com.example.struku.data.local.dao.ReceiptDao
 import com.example.struku.data.mapper.ReceiptMapper
 import com.example.struku.data.ocr.AdvancedImagePreprocessor
 import com.example.struku.data.ocr.MlKitOcrEngine
 import com.example.struku.data.ocr.PreprocessingVisualizer
-import com.example.struku.data.ocr.ReceiptParser
+import com.example.struku.data.repository.BudgetRepositoryImpl
+import com.example.struku.data.repository.CategoryRepositoryImpl
 import com.example.struku.data.repository.OcrRepositoryImpl
 import com.example.struku.data.repository.ReceiptRepositoryImpl
+import com.example.struku.domain.repository.BudgetRepository
+import com.example.struku.domain.repository.CategoryRepository
 import com.example.struku.domain.repository.OcrRepository
 import com.example.struku.domain.repository.ReceiptRepository
 import dagger.Module
@@ -61,11 +66,26 @@ object RepositoryModule {
     }
     
     /**
-     * Provide receipt parser
+     * Provide budget repository implementation
      */
     @Provides
     @Singleton
-    fun provideReceiptParser(): ReceiptParser {
-        return ReceiptParser()
+    fun provideBudgetRepository(
+        budgetDao: BudgetDao
+    ): BudgetRepository {
+        return BudgetRepositoryImpl(budgetDao)
     }
+    
+    /**
+     * Provide category repository implementation
+     */
+    @Provides
+    @Singleton
+    fun provideCategoryRepository(
+        categoryDao: CategoryDao
+    ): CategoryRepository {
+        return CategoryRepositoryImpl(categoryDao)
+    }
+    
+    /* Removed duplicate provider for ReceiptParser - now only in OcrModule */
 }

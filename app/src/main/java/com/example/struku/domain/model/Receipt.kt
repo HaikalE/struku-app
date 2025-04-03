@@ -17,13 +17,13 @@ data class Receipt(
     val merchantName: String,
     val date: @RawValue Date,
     val total: Double,
-    val currency: String? = "IDR",
+    val currency: String = "IDR",
     val category: String = "",
     val imageUri: String? = null,
     val items: List<LineItem> = emptyList(),
     val notes: String = "",
-    val createdAt: @RawValue Date? = null,
-    val updatedAt: @RawValue Date? = null
+    val createdAt: @RawValue Date = Date(),
+    val updatedAt: @RawValue Date = Date()
 ) : Parcelable {
     
     /**
@@ -70,45 +70,24 @@ data class Receipt(
         
         return difference > tolerance
     }
-}
-
-/**
- * Line item domain model
- */
-@Parcelize
-data class LineItem(
-    val id: Long = 0,
-    val name: String,
-    val price: Double,
-    val quantity: Double = 1.0,
-    val category: String = "",
-    val notes: String = ""
-) : Parcelable {
     
     /**
-     * Formatted price
+     * Get time since receipt was created
      */
-    fun getFormattedPrice(): String {
-        val format = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
-        return format.format(price)
-    }
-    
-    /**
-     * Formatted total
-     */
-    fun getFormattedTotal(): String {
-        val format = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
-        return format.format(price * quantity)
-    }
-    
-    /**
-     * Formatted quantity
-     */
-    fun getFormattedQuantity(): String {
-        return if (quantity == quantity.toInt().toDouble()) {
-            quantity.toInt().toString()
-        } else {
-            String.format("%.2f", quantity)
+    fun getTimeSinceCreated(): String {
+        val now = Date()
+        val diffInMillis = now.time - createdAt.time
+        val diffInSeconds = diffInMillis / 1000
+        val diffInMinutes = diffInSeconds / 60
+        val diffInHours = diffInMinutes / 60
+        val diffInDays = diffInHours / 24
+        
+        return when {
+            diffInDays > 30 -> "${diffInDays / 30} month(s) ago"
+            diffInDays > 0 -> "$diffInDays day(s) ago"
+            diffInHours > 0 -> "$diffInHours hour(s) ago"
+            diffInMinutes > 0 -> "$diffInMinutes minute(s) ago"
+            else -> "Just now"
         }
     }
 }

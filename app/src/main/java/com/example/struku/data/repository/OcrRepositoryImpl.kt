@@ -45,8 +45,8 @@ class OcrRepositoryImpl @Inject constructor(
     private val TAG = "OcrRepositoryImpl"
     
     // Increased timeout constants to prevent premature job cancellations
-    private val OCR_TIMEOUT_MS = 30000L  // 30 seconds (increased from 15)
-    private val PROCESSING_TIMEOUT_MS = 20000L  // 20 seconds (increased from 10)
+    private val OCR_TIMEOUT_MS = 45000L  // 45 seconds (increased from 30)
+    private val PROCESSING_TIMEOUT_MS = 30000L  // 30 seconds (increased from 20)
     
     // Track if a processing job is running
     private val isProcessing = AtomicBoolean(false)
@@ -83,6 +83,25 @@ class OcrRepositoryImpl @Inject constructor(
     }
     
     /**
+     * Detect if text likely contains dollar format
+     */
+    private fun detectDollarFormat(text: String): Boolean {
+        // Count dollar signs
+        val dollarSignCount = text.count { it == '$' }
+        
+        // Look for price patterns with dollar signs
+        val dollarPricePattern = Regex("\\$\\s*\\d+\\.\\d{2}")
+        val dollarPriceMatches = dollarPricePattern.findAll(text).count()
+        
+        // Check if there are specific columns that might indicate a US format receipt
+        val qtyPattern = Regex("(?i)\\b(qty|quantity)\\b")
+        val amountPattern = Regex("(?i)\\b(amount|subtotal)\\b")
+        
+        return dollarSignCount > 2 || dollarPriceMatches > 2 || 
+               (qtyPattern.containsMatchIn(text) && amountPattern.containsMatchIn(text))
+    }
+    
+    /**
      * Recognize text in a receipt image
      */
     override suspend fun recognizeReceiptImage(bitmap: Bitmap): String {
@@ -105,15 +124,27 @@ class OcrRepositoryImpl @Inject constructor(
                         bitmap
                     }
                     
-                    // First preprocess the image
-                    val config = ReceiptPreprocessingConfigFactory.createConfig()
+                    // First try with standard config
+                    val standardConfig = ReceiptPreprocessingConfigFactory.createConfig()
                     ensureActive() // Check if cancelled
                     
-                    val processedImage = imagePreprocessor.processReceiptImage(optimizedBitmap, config)
+                    val processedImage = imagePreprocessor.processReceiptImage(optimizedBitmap, standardConfig)
                     ensureActive() // Check if cancelled
                     
-                    // Then run OCR on it
-                    ocrEngine.recognizeText(processedImage)
+                    // Run OCR to get initial text
+                    val initialText = ocrEngine.recognizeText(processedImage)
+                    ensureActive() // Check if cancelled
+                    
+                    // If dollar format detected, try again with optimized config
+                    if (detectDollarFormat(initialText)) {
+                        Log.d(TAG, "Dollar format detected, applying specialized preprocessing")
+                        val dollarConfig = ReceiptPreprocessingConfigFactory.createDollarFormatConfig()
+                        val reprocessedImage = imagePreprocessor.processReceiptImage(optimizedBitmap, dollarConfig)
+                        ensureActive()
+                        ocrEngine.recognizeText(reprocessedImage)
+                    } else {
+                        initialText
+                    }
                 }
             } catch (e: TimeoutCancellationException) {
                 Log.e(TAG, "OCR timeout after ${OCR_TIMEOUT_MS}ms", e)
@@ -157,19 +188,30 @@ class OcrRepositoryImpl @Inject constructor(
                         bitmap
                     }
                     
-                    // Preprocess the image
-                    val config = ReceiptPreprocessingConfigFactory.createConfig()
+                    // First try with standard config
+                    val standardConfig = ReceiptPreprocessingConfigFactory.createConfig()
                     ensureActive() // Check if cancelled
                     
-                    val processedImage = imagePreprocessor.processReceiptImage(optimizedBitmap, config)
+                    val processedImage = imagePreprocessor.processReceiptImage(optimizedBitmap, standardConfig)
                     ensureActive() // Check if cancelled
                     
                     // Run OCR
-                    val text = ocrEngine.recognizeText(processedImage)
+                    val initialText = ocrEngine.recognizeText(processedImage)
                     ensureActive() // Check if cancelled
                     
+                    // Check if dollar format
+                    val finalText = if (detectDollarFormat(initialText)) {
+                        Log.d(TAG, "Dollar format detected during processing, applying specialized preprocessing")
+                        val dollarConfig = ReceiptPreprocessingConfigFactory.createDollarFormatConfig()
+                        val reprocessedImage = imagePreprocessor.processReceiptImage(optimizedBitmap, dollarConfig)
+                        ensureActive()
+                        ocrEngine.recognizeText(reprocessedImage)
+                    } else {
+                        initialText
+                    }
+                    
                     // Parse the results
-                    receiptParser.parse(text)
+                    receiptParser.parse(finalText)
                 }
             } catch (e: TimeoutCancellationException) {
                 Log.e(TAG, "Receipt processing timeout after ${OCR_TIMEOUT_MS}ms", e)
@@ -272,13 +314,27 @@ class OcrRepositoryImpl @Inject constructor(
                     val total = extractedData["total"] as? Double ?: 0.0
                     val date = extractedData["date"] as? Date ?: Date()
                     
+                    // Get items if available
+                    @Suppress("UNCHECKED_CAST")
+                    val itemsList = extractedData["items"] as? List<Map<String, Any>> ?: emptyList()
+                    
+                    // Convert generic item maps to LineItem objects
+                    val lineItems = itemsList.map { itemMap ->
+                        com.example.struku.domain.model.LineItem(
+                            name = itemMap["name"] as String,
+                            price = itemMap["price"] as Double,
+                            quantity = itemMap["quantity"] as Double,
+                            unitPrice = itemMap["price"] as Double
+                        )
+                    }
+                    
                     // Create and return a Receipt object
                     Receipt(
                         merchantName = merchantName,
                         total = total,
                         date = date,
                         imageUri = null,
-                        items = emptyList(),
+                        items = lineItems,
                         category = extractedData["category"] as? String ?: ""
                     )
                 }

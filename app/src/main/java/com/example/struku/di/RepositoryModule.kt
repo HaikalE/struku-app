@@ -61,36 +61,6 @@ object RepositoryModule {
     }
     
     /**
-     * Provide ML Kit OCR engine
-     */
-    @Provides
-    @Singleton
-    fun provideMlKitOcrEngine(@ApplicationContext context: Context): MlKitOcrEngine {
-        return MlKitOcrEngine(context)
-    }
-    
-    /**
-     * Provide preprocessing visualizer
-     */
-    @Provides
-    @Singleton
-    fun providePreprocessingVisualizer(@ApplicationContext context: Context): PreprocessingVisualizer {
-        return PreprocessingVisualizer(context)
-    }
-    
-    /**
-     * Provide advanced image preprocessor
-     */
-    @Provides
-    @Singleton
-    fun provideAdvancedImagePreprocessor(
-        @ApplicationContext context: Context,
-        visualizer: PreprocessingVisualizer
-    ): AdvancedImagePreprocessor {
-        return AdvancedImagePreprocessor(context, visualizer)
-    }
-    
-    /**
      * Provide receipt parser
      */
     @Provides

@@ -456,8 +456,8 @@ fun CategoryDialog(
                     
                     Button(
                         onClick = {
-                            val newCategory = if (isEditing) {
-                                category!!.copy(
+                            val newCategory = if (isEditing && category != null) {
+                                category.copy(
                                     name = name,
                                     color = color,
                                     iconName = iconName

@@ -105,7 +105,9 @@ class ReceiptReviewViewModel @Inject constructor(
             val receipt = state.receipt ?: return@update state
             val items = receipt.items.toMutableList()
             if (index < items.size) {
-                items[index] = items[index].copy(description = description)
+                // Create a new copy of the LineItem with the name updated
+                // (description is a property that maps to name)
+                items[index] = items[index].copy(name = description)
                 state.copy(receipt = receipt.copy(items = items))
             } else {
                 state
@@ -113,7 +115,7 @@ class ReceiptReviewViewModel @Inject constructor(
         }
     }
     
-    fun updateItemQuantity(index: Int, quantity: Int) {
+    fun updateItemQuantity(index: Int, quantity: Double) {
         _state.update { state ->
             val receipt = state.receipt ?: return@update state
             val items = receipt.items.toMutableList()
@@ -149,8 +151,8 @@ class ReceiptReviewViewModel @Inject constructor(
             val items = receipt.items.toMutableList()
             items.add(LineItem(
                 receiptId = receipt.id,
-                description = "",
-                quantity = 1,
+                name = "",
+                quantity = 1.0,
                 price = 0.0
             ))
             state.copy(receipt = receipt.copy(items = items))

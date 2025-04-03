@@ -89,4 +89,9 @@ interface ReceiptRepository {
      * Get total spending by month
      */
     fun getTotalByMonth(): Flow<Map<String, Double>>
+
+    /**
+     * Save a receipt from scan
+     */
+    suspend fun saveReceipt(receipt: Receipt): Long
 }

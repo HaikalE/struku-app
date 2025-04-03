@@ -34,7 +34,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -116,7 +115,8 @@ fun ReceiptDetailScreen(
                     
                     // Edit button
                     IconButton(onClick = {
-                        navController.navigate(NavRoutes.receiptEdit(receiptId))
+                        // Navigate to edit screen if it exists
+                        navController.navigate(NavRoutes.RECEIPT_REVIEW)
                     }) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }
@@ -251,7 +251,7 @@ fun ReceiptDetailContent(receipt: Receipt) {
         }
         
         // Notes if any
-        if (!receipt.notes.isNullOrEmpty()) {
+        if (receipt.notes.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
             
             Card(
@@ -265,7 +265,7 @@ fun ReceiptDetailContent(receipt: Receipt) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = receipt.notes ?: "",
+                        text = receipt.notes,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -291,7 +291,7 @@ fun LineItemDetail(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.description,
+                text = item.name,
                 style = MaterialTheme.typography.bodyLarge
             )
             if (item.quantity > 1 || item.unitPrice != null) {

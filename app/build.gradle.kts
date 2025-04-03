@@ -85,6 +85,22 @@ dependencies {
     // ML Kit for OCR
     implementation("com.google.mlkit:text-recognition:16.0.0")
     
+    // ML Kit document scanner
+    implementation("com.google.mlkit:document-scanner:16.0.0")
+    
+    // OpenCV for advanced image processing
+    implementation("org.opencv:opencv-android:4.8.0")
+    
+    // TensorFlow Lite for ML-based image enhancement
+    implementation("org.tensorflow:tensorflow-lite:2.13.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.13.0")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.13.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    
+    // Image processing libraries
+    implementation("jp.co.cyberagent.android:gpuimage:2.1.0") // GPU-accelerated image processing
+    implementation("com.github.bumptech.glide:glide:4.16.0")  // For image loading and caching
+    
     // Room for database
     implementation("androidx.room:room-runtime:2.6.0")
     implementation("androidx.room:room-ktx:2.6.0")

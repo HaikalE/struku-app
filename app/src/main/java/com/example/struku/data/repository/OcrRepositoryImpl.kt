@@ -1,6 +1,7 @@
 package com.example.struku.data.repository
 
 import android.graphics.Bitmap
+import android.util.Log
 import com.example.struku.data.ocr.AdvancedImagePreprocessor
 import com.example.struku.data.ocr.MlKitOcrEngine
 import com.example.struku.data.ocr.ReceiptParser
@@ -22,6 +23,8 @@ class OcrRepositoryImpl @Inject constructor(
     private val receiptParser: ReceiptParser
 ) : OcrRepository {
     
+    private val TAG = "OcrRepositoryImpl"
+    
     override suspend fun parseReceiptText(text: String): Map<String, Any> {
         return withContext(Dispatchers.Default) {
             receiptParser.parse(text)
@@ -30,26 +33,36 @@ class OcrRepositoryImpl @Inject constructor(
     
     override suspend fun recognizeReceiptImage(bitmap: Bitmap): String {
         return withContext(Dispatchers.Default) {
-            // First preprocess the image
-            val config = ReceiptPreprocessingConfigFactory.createBalancedConfig()
-            val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
-            
-            // Then run OCR on it
-            ocrEngine.recognizeText(processedImage)
+            try {
+                // First preprocess the image
+                val config = ReceiptPreprocessingConfigFactory.createConfig()
+                val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
+                
+                // Then run OCR on it
+                ocrEngine.recognizeText(processedImage)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error recognizing text in image: ${e.message}", e)
+                ""
+            }
         }
     }
     
     override suspend fun processReceipt(bitmap: Bitmap): Map<String, Any> {
         return withContext(Dispatchers.Default) {
-            // Preprocess the image
-            val config = ReceiptPreprocessingConfigFactory.createBalancedConfig()
-            val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
-            
-            // Run OCR
-            val text = ocrEngine.recognizeText(processedImage)
-            
-            // Parse the results
-            receiptParser.parse(text)
+            try {
+                // Preprocess the image
+                val config = ReceiptPreprocessingConfigFactory.createConfig()
+                val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
+                
+                // Run OCR
+                val text = ocrEngine.recognizeText(processedImage)
+                
+                // Parse the results
+                receiptParser.parse(text)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing receipt: ${e.message}", e)
+                mapOf("error" to "Failed to process receipt: ${e.message}")
+            }
         }
     }
     
@@ -58,14 +71,19 @@ class OcrRepositoryImpl @Inject constructor(
         config: ReceiptPreprocessingConfig
     ): Map<String, Any> {
         return withContext(Dispatchers.Default) {
-            // Preprocess with custom config
-            val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
-            
-            // Run OCR
-            val text = ocrEngine.recognizeText(processedImage)
-            
-            // Parse the results
-            receiptParser.parse(text)
+            try {
+                // Preprocess with custom config
+                val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
+                
+                // Run OCR
+                val text = ocrEngine.recognizeText(processedImage)
+                
+                // Parse the results
+                receiptParser.parse(text)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing receipt with custom config: ${e.message}", e)
+                mapOf("error" to "Failed to process receipt: ${e.message}")
+            }
         }
     }
 }

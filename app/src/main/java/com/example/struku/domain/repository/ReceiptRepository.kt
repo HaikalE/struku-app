@@ -1,58 +1,86 @@
 package com.example.struku.domain.repository
 
+import com.example.struku.domain.model.LineItem
 import com.example.struku.domain.model.Receipt
 import kotlinx.coroutines.flow.Flow
-import java.util.Date
 
 /**
- * Repository interface untuk operasi terkait struk
+ * Repository interface for managing receipt data
  */
 interface ReceiptRepository {
     /**
-     * Menyimpan struk baru ke database
-     * @return ID dari struk yang baru dibuat
+     * Get all receipts as a Flow
      */
-    suspend fun saveReceipt(receipt: Receipt): Long
+    fun getReceipts(): Flow<List<Receipt>>
     
     /**
-     * Mengupdate struk yang sudah ada
+     * Get a receipt by ID
+     */
+    suspend fun getReceipt(id: Long): Receipt?
+    
+    /**
+     * Insert a new receipt
+     * @return ID of the inserted receipt
+     */
+    suspend fun insertReceipt(receipt: Receipt): Long
+    
+    /**
+     * Update an existing receipt
      */
     suspend fun updateReceipt(receipt: Receipt)
     
     /**
-     * Menghapus struk berdasarkan ID
+     * Delete a receipt
      */
-    suspend fun deleteReceipt(receiptId: Long)
+    suspend fun deleteReceipt(receipt: Receipt)
     
     /**
-     * Mendapatkan struk berdasarkan ID
+     * Get all line items for a receipt
      */
-    suspend fun getReceiptById(receiptId: Long): Receipt?
+    suspend fun getLineItems(receiptId: Long): List<LineItem>
     
     /**
-     * Mendapatkan semua struk, diurutkan berdasarkan tanggal terbaru
+     * Insert a new line item
      */
-    fun getAllReceipts(): Flow<List<Receipt>>
+    suspend fun insertLineItem(lineItem: LineItem): Long
     
     /**
-     * Mendapatkan struk dalam rentang tanggal
+     * Update an existing line item
      */
-    fun getReceiptsByDateRange(startDate: Date, endDate: Date): Flow<List<Receipt>>
+    suspend fun updateLineItem(lineItem: LineItem)
     
     /**
-     * Mendapatkan struk berdasarkan kategori
+     * Delete a line item
+     */
+    suspend fun deleteLineItem(lineItem: LineItem)
+    
+    /**
+     * Get receipts by category
      */
     fun getReceiptsByCategory(category: String): Flow<List<Receipt>>
     
     /**
-     * Mendapatkan jumlah total pengeluaran per kategori dalam rentang tanggal
-     * @return Map kategori ke jumlah total
+     * Get receipts between two dates
      */
-    suspend fun getTotalByCategory(startDate: Date, endDate: Date): Map<String, Double>
+    fun getReceiptsByDateRange(startDate: Long, endDate: Long): Flow<List<Receipt>>
     
     /**
-     * Mendapatkan jumlah total pengeluaran per bulan dalam rentang tanggal
-     * @return Map bulan (format yyyy-MM) ke jumlah total
+     * Get receipts from a merchant
      */
-    suspend fun getTotalByMonth(startDate: Date, endDate: Date): Map<String, Double>
+    fun getReceiptsByMerchant(merchantName: String): Flow<List<Receipt>>
+    
+    /**
+     * Search receipts by query
+     */
+    fun searchReceipts(query: String): Flow<List<Receipt>>
+    
+    /**
+     * Get total spending by category
+     */
+    fun getTotalByCategory(): Flow<Map<String, Double>>
+    
+    /**
+     * Get total spending by month
+     */
+    fun getTotalByMonth(): Flow<Map<String, Double>>
 }

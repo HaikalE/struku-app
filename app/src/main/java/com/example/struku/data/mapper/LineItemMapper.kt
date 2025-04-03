@@ -9,12 +9,12 @@ import com.example.struku.domain.model.LineItem
 fun LineItem.toLineItemEntity(): LineItemEntity {
     return LineItemEntity(
         id = id,
-        receiptId = receiptId,
-        description = description,
-        quantity = quantity,
-        unitPrice = unitPrice,
+        receiptId = 0, // This needs to be set by the caller
+        name = name,
         price = price,
-        category = category
+        quantity = quantity,
+        category = category,
+        notes = notes
     )
 }
 
@@ -24,11 +24,10 @@ fun LineItem.toLineItemEntity(): LineItemEntity {
 fun LineItemEntity.toLineItem(): LineItem {
     return LineItem(
         id = id,
-        receiptId = receiptId,
-        description = description,
-        quantity = quantity,
-        unitPrice = unitPrice,
+        name = name,
         price = price,
-        category = category
+        quantity = quantity,
+        category = category,
+        notes = notes ?: ""
     )
 }

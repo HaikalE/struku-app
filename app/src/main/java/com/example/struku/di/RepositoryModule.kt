@@ -43,11 +43,12 @@ object RepositoryModule {
     @Provides
     @Singleton
     fun provideOcrRepository(
+        @ApplicationContext context: Context,
         ocrEngine: MlKitOcrEngine,
         imagePreprocessor: AdvancedImagePreprocessor,
         receiptParser: ReceiptParser
     ): OcrRepository {
-        return OcrRepositoryImpl(ocrEngine, imagePreprocessor, receiptParser)
+        return OcrRepositoryImpl(context, ocrEngine, imagePreprocessor, receiptParser)
     }
     
     /**

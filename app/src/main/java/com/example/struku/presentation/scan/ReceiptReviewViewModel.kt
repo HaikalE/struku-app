@@ -22,17 +22,19 @@ import javax.inject.Inject
 class ReceiptReviewViewModel @Inject constructor(
     private val receiptRepository: ReceiptRepository,
     private val categoryRepository: CategoryRepository,
-    private val savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReceiptReviewState())
     val state: StateFlow<ReceiptReviewState> = _state
     
+    // The receipt ID to be reviewed
+    private val receiptId: Long = savedStateHandle["receiptId"] ?: 0L
+    
     init {
         loadCategories()
         
-        // Check if we have a receiptId in the saved state handle
-        val receiptId = savedStateHandle.get<Long>("receiptId") ?: 0L
+        // Load receipt if ID is provided
         if (receiptId > 0) {
             loadReceipt(receiptId)
         }

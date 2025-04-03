@@ -247,4 +247,54 @@ class PreprocessingVisualizer @Inject constructor(
             return result
         }
     }
+    
+    /**
+     * Save a visualization to the device gallery
+     * Optimized version that uses MediaStore API on Android 10+ devices
+     */
+    fun saveVisualizationToGallery(bitmap: Bitmap, fileName: String): Boolean {
+        try {
+            Log.d(tag, "Saving visualization: $fileName")
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Use MediaStore API for Android 10+
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, "$fileName.png")
+                    put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Struku")
+                }
+                
+                val resolver = context.contentResolver
+                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { outputStream ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                        outputStream.flush()
+                    }
+                    return true
+                }
+            } else {
+                // Legacy approach for older Android versions
+                val storageDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                    "Struku"
+                ).apply {
+                    if (!exists()) {
+                        mkdirs()
+                    }
+                }
+                
+                val imageFile = File(storageDir, "$fileName.png")
+                FileOutputStream(imageFile).use { outputStream ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                    outputStream.flush()
+                }
+                return true
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error saving visualization: ${e.message}", e)
+        }
+        return false
+    }
 }

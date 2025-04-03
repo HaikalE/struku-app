@@ -19,6 +19,7 @@ import kotlin.coroutines.resumeWithException
  */
 @Singleton
 class MlKitOcrEngine @Inject constructor(
+    private val imagePreprocessor: AdvancedImagePreprocessor,
     @ApplicationContext private val context: Context
 ) {
     private val TAG = "MlKitOcrEngine"

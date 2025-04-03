@@ -190,14 +190,14 @@ fun TestImageThumbnail(
         elevation = CardDefaults.cardElevation(
             defaultElevation = if (isSelected) 8.dp else 2.dp
         ),
+        // Fix for type mismatch: using modifier parameter correctly
         border = if (isSelected) {
-            Modifier.border(
+            androidx.compose.ui.graphics.BorderStroke(
                 width = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-                shape = RoundedCornerShape(8.dp)
+                color = MaterialTheme.colorScheme.primary
             )
         } else {
-            Modifier
+            null
         }
     ) {
         Column(

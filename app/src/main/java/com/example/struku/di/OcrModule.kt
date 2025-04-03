@@ -33,8 +33,11 @@ object OcrModule {
 
     @Provides
     @Singleton
-    fun provideMlKitOcrEngine(imagePreprocessor: AdvancedImagePreprocessor): MlKitOcrEngine {
-        return MlKitOcrEngine(imagePreprocessor)
+    fun provideMlKitOcrEngine(
+        imagePreprocessor: AdvancedImagePreprocessor,
+        @ApplicationContext context: Context
+    ): MlKitOcrEngine {
+        return MlKitOcrEngine(imagePreprocessor, context)
     }
 
     @Provides

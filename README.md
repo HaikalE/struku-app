@@ -12,6 +12,46 @@ Aplikasi Android untuk memindai struk belanja, mengekstrak data pengeluaran, dan
 - **Privasi & Keamanan**: Autentikasi biometrik, data terenkripsi, dan operasi sepenuhnya offline.
 - **Ekspor Data**: Mengekspor data ke CSV untuk analisis lebih lanjut.
 - **Multi-bahasa**: Mendukung bahasa Inggris dan Indonesia.
+- **Advanced Image Processing**: Pipeline pre-processing kompleks untuk meningkatkan akurasi OCR.
+
+## 🔍 Pipeline Pre-Processing Canggih
+
+Struku menggunakan pipeline pre-processing gambar kompleks untuk meningkatkan akurasi OCR:
+
+### 1. Akuisisi Gambar & Optimasi Awal
+- **Deteksi Cahaya Real-time**: Adaptasi otomatis terhadap kondisi pencahayaan
+- **Mode HDR Adaptif**: Aktivasi HDR pada situasi kontras tinggi
+- **Burst-mode Capture**: Mengambil beberapa gambar untuk memilih hasil terbaik
+
+### 2. Deteksi & Koreksi Dokumen
+- **Edge Detection Multi-algoritma**: Kombinasi Canny, Document Boundary Detection dan deteksi kontur
+- **Koreksi Perspektif 3D**: Transformasi homografi untuk memperbaiki perspektif
+- **Auto-crop**: Pemotongan otomatis area struk dengan padding optimal
+
+### 3. Pre-Processing Dasar
+- **Konversi Grayscale dengan Weighting**: Bobot optimal RGB untuk teks struk
+- **Normalisasi Pencahayaan**: CLAHE untuk perbaikan kontras area gelap/terang
+- **Noise Reduction Selective**: Filter bilateral untuk tepi, non-local means untuk area datar
+
+### 4. Text Enhancement Adaptif
+- **Thresholding Multi-level**: Kombinasi Sauvola dan Niblack dengan fusion hasil
+- **Morphological Operations**: Dilasi dan opening untuk memperbaiki karakter
+- **Stroke Width Transformation**: Standardisasi lebar stroke karakter
+
+### 5. Layout Analysis
+- **Line Segmentation**: Deteksi baris teks untuk pemrosesan struktural
+- **Skew Correction**: Deteksi dan koreksi kemiringan multi-level
+- **Column Detection**: Identifikasi kolom price/quantity pada struk
+
+### 6. Specialized Enhancement
+- **Receipt Type Classification**: Deteksi otomatis jenis struk (termal, inkjet, laser)
+- **Background Removal**: Penghapusan pola latar belakang dan watermark
+- **Character Enhancement**: Perbaikan karakter berdasarkan ukuran dan jenis
+
+### 7. Post-Processing & Validasi
+- **Multi-orientation Text Detection**: Deteksi teks dengan orientasi berbeda
+- **Confidence Scoring**: Penilaian kepercayaan hasil pre-processing
+- **Visual Feedback**: Penandaan area yang memerlukan tinjauan manual
 
 ## 🛠️ Cara Menggunakan
 
@@ -47,8 +87,11 @@ Aplikasi Android untuk memindai struk belanja, mengekstrak data pengeluaran, dan
 
 ### OCR dan Pemrosesan Gambar
 - **Google ML Kit Text Recognition v2** - OCR offline di perangkat
+- **OpenCV** - Library pemrosesan gambar canggih untuk pre-processing
+- **ML Kit DocumentScanner** - Deteksi dan auto-cropping struk
+- **TensorFlow Lite** - ML model untuk peningkatan gambar adaptif
+- **GPUImage** - GPU-accelerated image processing untuk kinerja lebih baik
 - **CameraX** - Pengambilan gambar dan antarmuka kamera
-- **OpenCV/ML Kit DocumentScanner** - Deteksi dan auto-cropping struk
 
 ### Arsitektur Aplikasi
 - **Bahasa**: Kotlin
@@ -102,6 +145,10 @@ app/
 │   │   │   ├── data/               # Implementasi repositori, sumber data
 │   │   │   │   ├── local/          # Database Room, DAO
 │   │   │   │   └── ocr/            # Implementasi OCR, ML Kit
+│   │   │   │      ├── AdvancedImagePreprocessor.kt  # Pipeline preprocessing canggih
+│   │   │   │      ├── ReceiptPreprocessingConfig.kt # Konfigurasi preprocessing
+│   │   │   │      ├── MlKitOcrEngine.kt             # Engine OCR dengan preprocessing
+│   │   │   │      └── ReceiptParser.kt              # Parser output OCR
 │   │   │   ├── di/                 # Dependency Injection dengan Hilt
 │   │   │   ├── domain/             # Model, use cases, antarmuka repositori
 │   │   │   │   ├── model/          # Entitas bisnis (Receipt, LineItem, etc)

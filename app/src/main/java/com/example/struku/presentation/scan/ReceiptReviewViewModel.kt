@@ -50,7 +50,7 @@ class ReceiptReviewViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, error = null) }
             
             try {
-                val receipt = receiptRepository.getReceiptById(receiptId)
+                val receipt = receiptRepository.getReceipt(receiptId)
                 _state.update { it.copy(isLoading = false, receipt = receipt) }
                 
                 // Calculate total automatically
@@ -100,12 +100,12 @@ class ReceiptReviewViewModel @Inject constructor(
         }
     }
     
-    fun updateItemDescription(index: Int, description: String) {
+    fun updateItemName(index: Int, name: String) {
         _state.update { state ->
             val receipt = state.receipt ?: return@update state
             val items = receipt.items.toMutableList()
             if (index < items.size) {
-                items[index] = items[index].copy(description = description)
+                items[index] = items[index].copy(name = name)
                 state.copy(receipt = receipt.copy(items = items))
             } else {
                 state
@@ -113,7 +113,7 @@ class ReceiptReviewViewModel @Inject constructor(
         }
     }
     
-    fun updateItemQuantity(index: Int, quantity: Int) {
+    fun updateItemQuantity(index: Int, quantity: Double) {
         _state.update { state ->
             val receipt = state.receipt ?: return@update state
             val items = receipt.items.toMutableList()
@@ -148,9 +148,7 @@ class ReceiptReviewViewModel @Inject constructor(
             val receipt = state.receipt ?: return@update state
             val items = receipt.items.toMutableList()
             items.add(LineItem(
-                receiptId = receipt.id,
-                description = "",
-                quantity = 1,
+                name = "",
                 price = 0.0
             ))
             state.copy(receipt = receipt.copy(items = items))

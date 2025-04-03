@@ -27,7 +27,7 @@ class ReceiptDetailViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, error = null) }
             
             try {
-                val receipt = receiptRepository.getReceiptById(receiptId)
+                val receipt = receiptRepository.getReceipt(receiptId)
                 _state.update { it.copy(isLoading = false, receipt = receipt) }
             } catch (e: Exception) {
                 _state.update { it.copy(
@@ -43,8 +43,16 @@ class ReceiptDetailViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, error = null) }
             
             try {
-                receiptRepository.deleteReceipt(currentReceiptId)
-                _state.update { it.copy(isLoading = false, isDeleted = true) }
+                val receipt = receiptRepository.getReceipt(currentReceiptId)
+                if (receipt != null) {
+                    receiptRepository.deleteReceipt(receipt)
+                    _state.update { it.copy(isLoading = false, isDeleted = true) }
+                } else {
+                    _state.update { it.copy(
+                        isLoading = false,
+                        error = "Struk tidak ditemukan"
+                    ) }
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(
                     isLoading = false,

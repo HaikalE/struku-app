@@ -33,7 +33,7 @@ class ReceiptsViewModel @Inject constructor(
     
     private fun loadReceipts() {
         viewModelScope.launch {
-            receiptRepository.getAllReceipts()
+            receiptRepository.getReceipts()
                 .catch { error ->
                     _state.update { it.copy(
                         isLoading = false,

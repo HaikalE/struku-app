@@ -30,7 +30,7 @@ class ExportViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, error = null) }
             
             try {
-                val receipts = receiptRepository.getAllReceipts().first()
+                val receipts = receiptRepository.getReceipts().first()
                 _state.update { it.copy(
                     isLoading = false,
                     receiptCount = receipts.size
@@ -49,7 +49,7 @@ class ExportViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true, error = null, message = null) }
             
             try {
-                val receipts = receiptRepository.getAllReceipts().first()
+                val receipts = receiptRepository.getReceipts().first()
                 if (receipts.isEmpty()) {
                     _state.update { it.copy(
                         isLoading = false,

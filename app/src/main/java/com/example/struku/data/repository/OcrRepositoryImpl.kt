@@ -16,7 +16,9 @@ import com.example.struku.domain.model.Receipt
 import com.example.struku.domain.repository.OcrRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
@@ -39,21 +41,40 @@ class OcrRepositoryImpl @Inject constructor(
     
     private val TAG = "OcrRepositoryImpl"
     
+    // Konstanta timeout untuk mencegah pemrosesan yang terlalu lama
+    private val OCR_TIMEOUT_MS = 15000L // 15 detik
+    private val PROCESSING_TIMEOUT_MS = 10000L // 10 detik
+    
     override suspend fun parseReceiptText(text: String): Map<String, Any> {
         return withContext(Dispatchers.Default) {
-            receiptParser.parse(text)
+            try {
+                withTimeout(PROCESSING_TIMEOUT_MS) {
+                    receiptParser.parse(text)
+                }
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "Text parsing timeout after ${PROCESSING_TIMEOUT_MS}ms", e)
+                mapOf("error" to "Proses terlalu lama. Silakan coba lagi.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing receipt text: ${e.message}", e)
+                mapOf("error" to "Gagal mengurai teks struk: ${e.message}")
+            }
         }
     }
     
     override suspend fun recognizeReceiptImage(bitmap: Bitmap): String {
         return withContext(Dispatchers.Default) {
             try {
-                // First preprocess the image
-                val config = ReceiptPreprocessingConfigFactory.createConfig()
-                val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
-                
-                // Then run OCR on it
-                ocrEngine.recognizeText(processedImage)
+                withTimeout(OCR_TIMEOUT_MS) {
+                    // First preprocess the image
+                    val config = ReceiptPreprocessingConfigFactory.createConfig()
+                    val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
+                    
+                    // Then run OCR on it
+                    ocrEngine.recognizeText(processedImage)
+                }
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "OCR timeout after ${OCR_TIMEOUT_MS}ms", e)
+                "Proses pengenalan teks terlalu lama. Silakan coba lagi."
             } catch (e: Exception) {
                 Log.e(TAG, "Error recognizing text in image: ${e.message}", e)
                 ""
@@ -64,18 +85,23 @@ class OcrRepositoryImpl @Inject constructor(
     override suspend fun processReceipt(bitmap: Bitmap): Map<String, Any> {
         return withContext(Dispatchers.Default) {
             try {
-                // Preprocess the image
-                val config = ReceiptPreprocessingConfigFactory.createConfig()
-                val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
-                
-                // Run OCR
-                val text = ocrEngine.recognizeText(processedImage)
-                
-                // Parse the results
-                receiptParser.parse(text)
+                withTimeout(OCR_TIMEOUT_MS) {
+                    // Preprocess the image
+                    val config = ReceiptPreprocessingConfigFactory.createConfig()
+                    val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
+                    
+                    // Run OCR
+                    val text = ocrEngine.recognizeText(processedImage)
+                    
+                    // Parse the results
+                    receiptParser.parse(text)
+                }
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "Receipt processing timeout after ${OCR_TIMEOUT_MS}ms", e)
+                mapOf("error" to "Proses terlalu lama. Silakan coba lagi.")
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing receipt: ${e.message}", e)
-                mapOf("error" to "Failed to process receipt: ${e.message}")
+                mapOf("error" to "Gagal memproses struk: ${e.message}")
             }
         }
     }
@@ -86,17 +112,22 @@ class OcrRepositoryImpl @Inject constructor(
     ): Map<String, Any> {
         return withContext(Dispatchers.Default) {
             try {
-                // Preprocess with custom config
-                val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
-                
-                // Run OCR
-                val text = ocrEngine.recognizeText(processedImage)
-                
-                // Parse the results
-                receiptParser.parse(text)
+                withTimeout(OCR_TIMEOUT_MS) {
+                    // Preprocess with custom config
+                    val processedImage = imagePreprocessor.processReceiptImage(bitmap, config)
+                    
+                    // Run OCR
+                    val text = ocrEngine.recognizeText(processedImage)
+                    
+                    // Parse the results
+                    receiptParser.parse(text)
+                }
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "Receipt processing timeout after ${OCR_TIMEOUT_MS}ms", e)
+                mapOf("error" to "Proses terlalu lama. Silakan coba lagi.")
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing receipt with custom config: ${e.message}", e)
-                mapOf("error" to "Failed to process receipt: ${e.message}")
+                mapOf("error" to "Gagal memproses struk: ${e.message}")
             }
         }
     }
@@ -104,23 +135,28 @@ class OcrRepositoryImpl @Inject constructor(
     override suspend fun scanReceipt(bitmap: Bitmap): Receipt? {
         return withContext(Dispatchers.Default) {
             try {
-                // Process the receipt
-                val extractedData = processReceipt(bitmap)
-                
-                // Convert the extracted data to a Receipt object
-                val merchantName = extractedData["merchantName"] as? String ?: "Unknown Merchant"
-                val total = extractedData["total"] as? Double ?: 0.0
-                val date = extractedData["date"] as? Date ?: Date()
-                
-                // Create and return a Receipt object
-                Receipt(
-                    merchantName = merchantName,
-                    total = total,
-                    date = date,
-                    imageUri = null,
-                    items = emptyList(),
-                    category = extractedData["category"] as? String ?: ""
-                )
+                withTimeout(OCR_TIMEOUT_MS) {
+                    // Process the receipt
+                    val extractedData = processReceipt(bitmap)
+                    
+                    // Convert the extracted data to a Receipt object
+                    val merchantName = extractedData["merchantName"] as? String ?: "Unknown Merchant"
+                    val total = extractedData["total"] as? Double ?: 0.0
+                    val date = extractedData["date"] as? Date ?: Date()
+                    
+                    // Create and return a Receipt object
+                    Receipt(
+                        merchantName = merchantName,
+                        total = total,
+                        date = date,
+                        imageUri = null,
+                        items = emptyList(),
+                        category = extractedData["category"] as? String ?: ""
+                    )
+                }
+            } catch (e: TimeoutCancellationException) {
+                Log.e(TAG, "Receipt scanning timeout after ${OCR_TIMEOUT_MS}ms", e)
+                null
             } catch (e: Exception) {
                 Log.e(TAG, "Error scanning receipt: ${e.message}", e)
                 null

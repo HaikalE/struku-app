@@ -87,6 +87,4 @@ object RepositoryModule {
     ): CategoryRepository {
         return CategoryRepositoryImpl(categoryDao)
     }
-    
-    /* Removed duplicate provider for ReceiptParser - now only in OcrModule */
 }

@@ -436,7 +436,7 @@ class ReceiptParser @Inject constructor() {
             listOf("bill", "utility", "electric", "water", "gas", "internet", "phone") to "Bills & Utilities"
         )
         
-        val lcText = (merchantName + " " + text).toLowerCase()
+        val lcText = (merchantName + " " + text).lowercase()
         
         for ((keywords, category) in categories) {
             if (keywords.any { lcText.contains(it) }) {

@@ -30,17 +30,20 @@ class ReceiptParser @Inject constructor() {
             // Extract key information
             val merchantName = extractMerchantName(text)
             val date = extractDate(text)
-            val total = extractTotal(text)
             val items = extractLineItems(text)
             val currency = extractCurrency(text)
             
+            // Calculate total from extracted items
+            val total = items.sumOf { (it["total"] as? Double) ?: 0.0 }
+            
             // Build result map
-            val result = mutableMapOf<String, Any>()
-            result["merchantName"] = merchantName
-            result["date"] = date
-            result["total"] = total
-            result["items"] = items
-            result["currency"] = currency
+            val result = mutableMapOf<String, Any>(
+                "merchantName" to merchantName,
+                "date" to date,
+                "total" to total,
+                "items" to items,
+                "currency" to currency
+            )
             
             // Additional data
             val notes = extractNotes(text)
@@ -93,7 +96,9 @@ class ReceiptParser @Inject constructor() {
             // YYYY/MM/DD
             Pattern.compile("(\\d{4}[/.-]\\d{1,2}[/.-]\\d{1,2})"),
             // Text representations
-            Pattern.compile("(\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{2,4})", Pattern.CASE_INSENSITIVE)
+            Pattern.compile("(\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{2,4})", Pattern.CASE_INSENSITIVE),
+            // Format like "04/03/2018 11:23AM"
+            Pattern.compile("(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})\\s+\\d{1,2}:\\d{2}")
         )
         
         // Try each pattern
@@ -106,7 +111,8 @@ class ReceiptParser @Inject constructor() {
                 val dateFormats = listOf(
                     "dd/MM/yyyy", "d/M/yyyy", "yyyy/MM/dd",
                     "dd-MM-yyyy", "yyyy-MM-dd",
-                    "dd MMM yyyy", "d MMM yyyy"
+                    "dd MMM yyyy", "d MMM yyyy",
+                    "MM/dd/yyyy", "M/d/yyyy"
                 )
                 
                 for (format in dateFormats) {
@@ -125,87 +131,198 @@ class ReceiptParser @Inject constructor() {
     }
     
     /**
-     * Extract total amount from receipt text
-     */
-    private fun extractTotal(text: String): Double {
-        // Common patterns for total amount
-        val totalPatterns = listOf(
-            Pattern.compile("(?i)total\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
-            Pattern.compile("(?i)amount\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
-            Pattern.compile("(?i)grand total\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
-            Pattern.compile("(?i)sum\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
-            Pattern.compile("(?i)to pay\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})")
-        )
-        
-        // Try each pattern
-        for (pattern in totalPatterns) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val totalStr = matcher.group(1)
-                    .replace("$", "")
-                    .replace(",", "")
-                    .replace(" ", "")
-                
-                try {
-                    return totalStr.toDouble()
-                } catch (e: NumberFormatException) {
-                    // Try next pattern
-                }
-            }
-        }
-        
-        // If no specific total found, look for last price in the receipt
-        val pricePattern = Pattern.compile("(\\d+[,\\d]*\\.\\d{2})")
-        val matcher = pricePattern.matcher(text)
-        var lastPrice = 0.0
-        
-        while (matcher.find()) {
-            try {
-                val priceStr = matcher.group(1).replace(",", "")
-                val price = priceStr.toDouble()
-                lastPrice = price
-            } catch (e: NumberFormatException) {
-                // Skip invalid prices
-            }
-        }
-        
-        return lastPrice
-    }
-    
-    /**
-     * Extract line items from receipt text
+     * Extract line items from receipt text - enhanced to better detect various formats
      */
     private fun extractLineItems(text: String): List<Map<String, Any>> {
         val items = mutableListOf<Map<String, Any>>()
         val lines = text.split("\n")
         
-        // Simple item pattern: item name followed by price
-        val itemPattern = Pattern.compile("(.+?)\\s+(\\d+(?:\\.\\d{2})?)\\s*$")
+        // Multiple patterns to match different receipt formats
+        val itemPatterns = listOf(
+            // Pattern 1: "Item Description   $12.34"
+            Pattern.compile("(.+?)\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})\\s*$"),
+            
+            // Pattern 2: "1 x Item @ $12.34"
+            Pattern.compile("(\\d+)\\s*[xX]\\s*(.+?)\\s*@?\\s*(\\$?\\s*\\d+[,\\d]*\\.\\d{2})"),
+            
+            // Pattern 3: "Item.....$12.34" (dots or spaces as separator)
+            Pattern.compile("(.+?)[.\\s]{3,}(\\$?\\s*\\d+[,\\d]*\\.\\d{2})"),
+            
+            // Pattern 4: "Item Description $12.34 $12.34" (unit price and total)
+            Pattern.compile("(.+?)\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})"),
+            
+            // Pattern 5: "1 Item $12.34" (quantity at beginning)
+            Pattern.compile("^(\\d+)\\s+(.+?)\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})\\s*$")
+        )
+
+        // Pattern for detecting the start of table headers or separator lines
+        val headerPattern = Pattern.compile("(item|description|qty|quantity|price|amount|total)", Pattern.CASE_INSENSITIVE)
+        val separatorPattern = Pattern.compile("^[-_.=*]{5,}$")
+        
+        // Flag to indicate we're in the items section of receipt
+        var inItemsSection = false
         
         for (line in lines) {
-            val matcher = itemPattern.matcher(line)
-            if (matcher.find()) {
+            // Skip empty lines
+            if (line.trim().isEmpty()) continue
+            
+            // Check if this is a header line
+            if (headerPattern.matcher(line).find()) {
+                inItemsSection = true
+                continue
+            }
+            
+            // Skip separator lines
+            if (separatorPattern.matcher(line.trim()).matches()) {
+                continue
+            }
+            
+            // Skip lines likely to be not items
+            if (line.length < 5 || 
+                line.contains("SUBTOTAL", ignoreCase = true) ||
+                line.contains("TAX", ignoreCase = true) ||
+                line.contains("TOTAL", ignoreCase = true)) {
+                continue
+            }
+            
+            // Try each pattern until we find a match
+            var matched = false
+            
+            for (pattern in itemPatterns) {
+                val matcher = pattern.matcher(line)
+                if (matcher.find()) {
+                    try {
+                        when (pattern) {
+                            itemPatterns[0] -> { // Pattern 1: Item Description $12.34
+                                val name = matcher.group(1).trim()
+                                val priceStr = matcher.group(2).replace("$", "").replace(",", "").trim()
+                                val price = priceStr.toDouble()
+                                
+                                items.add(mapOf(
+                                    "name" to name,
+                                    "price" to price,
+                                    "quantity" to 1.0,
+                                    "total" to price
+                                ))
+                                matched = true
+                            }
+                            
+                            itemPatterns[1] -> { // Pattern 2: 1 x Item @ $12.34
+                                val quantity = matcher.group(1).toDouble()
+                                val name = matcher.group(2).trim()
+                                val priceStr = matcher.group(3).replace("$", "").replace(",", "").trim()
+                                val price = priceStr.toDouble() 
+                                
+                                items.add(mapOf(
+                                    "name" to name,
+                                    "price" to price,
+                                    "quantity" to quantity,
+                                    "total" to (price * quantity)
+                                ))
+                                matched = true
+                            }
+                            
+                            itemPatterns[2] -> { // Pattern 3: Item.....$12.34
+                                val name = matcher.group(1).trim()
+                                val priceStr = matcher.group(2).replace("$", "").replace(",", "").trim()
+                                val price = priceStr.toDouble()
+                                
+                                items.add(mapOf(
+                                    "name" to name,
+                                    "price" to price,
+                                    "quantity" to 1.0,
+                                    "total" to price
+                                ))
+                                matched = true
+                            }
+                            
+                            itemPatterns[3] -> { // Pattern 4: Item Description $12.34 $12.34
+                                val name = matcher.group(1).trim()
+                                val unitPriceStr = matcher.group(2).replace("$", "").replace(",", "").trim()
+                                val totalPriceStr = matcher.group(3).replace("$", "").replace(",", "").trim()
+                                
+                                val unitPrice = unitPriceStr.toDouble()
+                                val totalPrice = totalPriceStr.toDouble()
+                                
+                                // Calculate quantity based on total and unit price
+                                val quantity = if (unitPrice > 0) totalPrice / unitPrice else 1.0
+                                
+                                items.add(mapOf(
+                                    "name" to name,
+                                    "price" to unitPrice,
+                                    "quantity" to quantity,
+                                    "total" to totalPrice
+                                ))
+                                matched = true
+                            }
+                            
+                            itemPatterns[4] -> { // Pattern 5: 1 Item $12.34
+                                val quantity = matcher.group(1).toDouble()
+                                val name = matcher.group(2).trim()
+                                val priceStr = matcher.group(3).replace("$", "").replace(",", "").trim()
+                                val price = priceStr.toDouble() / quantity  // This is the unit price
+                                
+                                items.add(mapOf(
+                                    "name" to name,
+                                    "price" to price,
+                                    "quantity" to quantity,
+                                    "total" to price * quantity
+                                ))
+                                matched = true
+                            }
+                        }
+                        
+                        if (matched) break
+                    } catch (e: Exception) {
+                        // Skip this pattern if parsing fails
+                        Log.d(TAG, "Failed to parse item with pattern: $e")
+                    }
+                }
+            }
+            
+            // Try with a simple number extraction if no other matches found
+            if (!matched && inItemsSection) {
                 try {
-                    val name = matcher.group(1).trim()
-                    val price = matcher.group(2).toDouble()
+                    // Last-ditch effort to find prices in the line
+                    val priceFinderPattern = Pattern.compile("\\$(\\d+\\.\\d{2})")
+                    val priceMatcher = priceFinderPattern.matcher(line)
                     
-                    // Skip very short item names or suspiciously high prices
-                    if (name.length > 2 && price > 0 && price < 10000) {
-                        val item = mapOf(
-                            "name" to name,
-                            "price" to price,
-                            "quantity" to 1.0,
-                            "total" to price
-                        )
-                        items.add(item)
+                    if (priceMatcher.find()) {
+                        // Extract the price and assume the rest is description
+                        val priceStr = priceMatcher.group(1)
+                        val price = priceStr.toDouble()
+                        
+                        // Extract description by removing the price part
+                        val description = line.substring(0, priceMatcher.start()).trim()
+                        
+                        if (description.isNotEmpty() && price > 0) {
+                            items.add(mapOf(
+                                "name" to description,
+                                "price" to price,
+                                "quantity" to 1.0,
+                                "total" to price
+                            ))
+                        }
                     }
                 } catch (e: Exception) {
-                    // Skip this line if parsing fails
+                    // Just continue if this fails
                 }
             }
         }
         
-        return items
+        // Filter out suspicious items
+        return items.filter { 
+            val name = it["name"] as String
+            val price = it["price"] as Double
+            val quantity = it["quantity"] as Double
+            
+            name.isNotEmpty() && 
+            name.length > 2 && 
+            price > 0 && 
+            price < 10000 &&  // Exclude very high prices
+            quantity > 0 &&
+            !name.matches(Regex("(?i)total|subtotal|tax|discount|service"))  // Skip headers or summary lines
+        }
     }
     
     /**
@@ -253,6 +370,54 @@ class ReceiptParser @Inject constructor() {
         }
         
         return ""
+    }
+    
+    /**
+     * Extract total amount from receipt text (as a fallback)
+     */
+    private fun extractTotal(text: String): Double {
+        // Common patterns for total amount
+        val totalPatterns = listOf(
+            Pattern.compile("(?i)total\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)amount\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)grand total\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)sum\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)to pay\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})")
+        )
+        
+        // Try each pattern
+        for (pattern in totalPatterns) {
+            val matcher = pattern.matcher(text)
+            if (matcher.find()) {
+                val totalStr = matcher.group(1)
+                    .replace("$", "")
+                    .replace(",", "")
+                    .replace(" ", "")
+                
+                try {
+                    return totalStr.toDouble()
+                } catch (e: NumberFormatException) {
+                    // Try next pattern
+                }
+            }
+        }
+        
+        // If no specific total found, look for last price in the receipt
+        val pricePattern = Pattern.compile("(\\d+[,\\d]*\\.\\d{2})")
+        val matcher = pricePattern.matcher(text)
+        var lastPrice = 0.0
+        
+        while (matcher.find()) {
+            try {
+                val priceStr = matcher.group(1).replace(",", "")
+                val price = priceStr.toDouble()
+                lastPrice = price
+            } catch (e: NumberFormatException) {
+                // Skip invalid prices
+            }
+        }
+        
+        return lastPrice
     }
     
     /**

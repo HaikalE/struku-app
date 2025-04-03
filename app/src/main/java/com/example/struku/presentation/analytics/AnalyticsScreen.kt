@@ -18,7 +18,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Divider
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -29,21 +44,6 @@ import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -518,7 +518,7 @@ fun ExpenseTrendCard(state: AnalyticsState) {
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            Divider()
+            HorizontalDivider()
             
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -774,7 +774,6 @@ fun ExpenseOverviewCard(state: AnalyticsState) {
                     progress = overallProgress.toFloat(),
                     color = if (isOverBudget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
-                    strokeCap = StrokeCap.Round,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(12.dp)
@@ -910,7 +909,6 @@ fun CategoryExpenseItem(
                             progress = progress.toFloat(),
                             color = if (isOverBudget) MaterialTheme.colorScheme.error else categoryColor,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            strokeCap = StrokeCap.Round,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(8.dp)

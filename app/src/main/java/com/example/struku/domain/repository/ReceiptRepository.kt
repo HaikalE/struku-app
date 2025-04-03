@@ -3,6 +3,7 @@ package com.example.struku.domain.repository
 import com.example.struku.domain.model.LineItem
 import com.example.struku.domain.model.Receipt
 import kotlinx.coroutines.flow.Flow
+import java.util.Date
 
 /**
  * Repository interface for managing receipt data
@@ -78,6 +79,11 @@ interface ReceiptRepository {
      * Get total spending by category
      */
     fun getTotalByCategory(): Flow<Map<String, Double>>
+    
+    /**
+     * Get total spending by category within date range
+     */
+    suspend fun getTotalByCategory(startDate: Date, endDate: Date): Map<String, Double>
     
     /**
      * Get total spending by month

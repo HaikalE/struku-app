@@ -65,6 +65,13 @@ class ReceiptRepositoryImpl @Inject constructor(
         // Line items will be deleted by Room's cascading delete
     }
     
+    override suspend fun deleteReceipt(id: Long) {
+        val receipt = getReceipt(id)
+        if (receipt != null) {
+            deleteReceipt(receipt)
+        }
+    }
+    
     override suspend fun getLineItems(receiptId: Long): List<LineItem> {
         return receiptDao.getLineItemsForReceipt(receiptId).map { 
             mapper.mapLineItemToDomain(it) 
@@ -140,5 +147,13 @@ class ReceiptRepositoryImpl @Inject constructor(
     
     override suspend fun saveReceipt(receipt: Receipt): Long {
         return insertReceipt(receipt)
+    }
+    
+    override suspend fun getReceiptById(id: Long): Receipt? {
+        return getReceipt(id)
+    }
+    
+    override fun getAllReceipts(): Flow<List<Receipt>> {
+        return getReceipts()
     }
 }

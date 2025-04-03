@@ -34,7 +34,15 @@ class ReceiptParser @Inject constructor() {
             val currency = extractCurrency(text)
             
             // Calculate total from extracted items
-            val total = items.sumOf { (it["total"] as? Double) ?: 0.0 }
+            val total = if (items.isNotEmpty()) {
+                items.sumOf { (it["total"] as? Double) ?: 0.0 }
+            } else {
+                // Fallback to extracting total directly
+                extractTotal(text)
+            }
+            
+            // Log the results for debugging
+            Log.d(TAG, "Parsed $merchantName with ${items.size} items, total: $total $currency")
             
             // Build result map
             val result = mutableMapOf<String, Any>(
@@ -98,7 +106,9 @@ class ReceiptParser @Inject constructor() {
             // Text representations
             Pattern.compile("(\\d{1,2}\\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{2,4})", Pattern.CASE_INSENSITIVE),
             // Format like "04/03/2018 11:23AM"
-            Pattern.compile("(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})\\s+\\d{1,2}:\\d{2}")
+            Pattern.compile("(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})\\s+\\d{1,2}:\\d{2}"),
+            // Format dengan Mon (Month abbreviation) seperti "Mon 05/04/2018 11:25AM"
+            Pattern.compile("(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\s+(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})")
         )
         
         // Try each pattern
@@ -152,7 +162,13 @@ class ReceiptParser @Inject constructor() {
             Pattern.compile("(.+?)\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})"),
             
             // Pattern 5: "1 Item $12.34" (quantity at beginning)
-            Pattern.compile("^(\\d+)\\s+(.+?)\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})\\s*$")
+            Pattern.compile("^(\\d+)\\s+(.+?)\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})\\s*$"),
+            
+            // Pattern 6: "N. Item Description   $12.34" (numbered item dengan titik)
+            Pattern.compile("^(\\d+)\\s*\\.\\s*(.+?)\\s+(\\$?\\s*\\d+[,\\d]*\\.\\d{2})\\s*$"),
+            
+            // Pattern 7: Special untuk format struk Amerika dengan item bernomor
+            Pattern.compile("^\\s*(\\d+)\\s*\\.?\\s*([\\w\\s\\p{Punct}&&[^\\$]]+)\\s*(\\$?\\s*\\d+[,\\d]*\\.\\d{2})\\s*$")
         )
 
         // Pattern for detecting the start of table headers or separator lines
@@ -162,9 +178,26 @@ class ReceiptParser @Inject constructor() {
         // Flag to indicate we're in the items section of receipt
         var inItemsSection = false
         
-        for (line in lines) {
+        // Special case untuk struk yang memiliki banyak item bernomor
+        var hasNumberedItems = false
+        var consecutiveNumberedLines = 0
+        
+        for (i in lines.indices) {
+            val line = lines[i]
+            
             // Skip empty lines
             if (line.trim().isEmpty()) continue
+            
+            // Look for consecutive numbered lines to identify numbered item format
+            if (line.trim().matches(Regex("^\\s*\\d+\\..*"))) {
+                consecutiveNumberedLines++
+                if (consecutiveNumberedLines >= 2) {
+                    hasNumberedItems = true
+                    inItemsSection = true
+                }
+            } else {
+                consecutiveNumberedLines = 0
+            }
             
             // Check if this is a header line
             if (headerPattern.matcher(line).find()) {
@@ -188,7 +221,15 @@ class ReceiptParser @Inject constructor() {
             // Try each pattern until we find a match
             var matched = false
             
-            for (pattern in itemPatterns) {
+            // Prioritize Pattern 6 & 7 for numbered item formats if we detected such a format
+            val patternsToTry = if (hasNumberedItems) {
+                listOf(itemPatterns[6], itemPatterns[5], itemPatterns[0], itemPatterns[1], 
+                      itemPatterns[2], itemPatterns[3], itemPatterns[4])
+            } else {
+                itemPatterns
+            }
+            
+            for (pattern in patternsToTry) {
                 val matcher = pattern.matcher(line)
                 if (matcher.find()) {
                     try {
@@ -270,6 +311,23 @@ class ReceiptParser @Inject constructor() {
                                 ))
                                 matched = true
                             }
+                            
+                            itemPatterns[5], itemPatterns[6] -> { // Pattern 6 & 7: N. Item Description $12.34
+                                val itemNumber = matcher.group(1).toInt()
+                                val name = matcher.group(2).trim()
+                                val priceStr = matcher.group(3).replace("$", "").replace(",", "").trim()
+                                val price = priceStr.toDouble()
+                                
+                                items.add(mapOf(
+                                    "name" to name,
+                                    "price" to price,
+                                    "quantity" to 1.0,
+                                    "total" to price,
+                                    "itemNumber" to itemNumber
+                                ))
+                                matched = true
+                                inItemsSection = true
+                            }
                         }
                         
                         if (matched) break
@@ -310,8 +368,58 @@ class ReceiptParser @Inject constructor() {
             }
         }
         
+        // Jika tidak ada item yang ditemukan, coba dengan pendekatan yang lebih agresif
+        if (items.isEmpty()) {
+            Log.d(TAG, "No items found with standard patterns, trying aggressive approach")
+            
+            // Mencoba mencari bagian teks yang mengandung daftar item (biasanya bagian tengah struk)
+            val potentialItemSection = text.split("\n")
+                .drop(3) // Skip header
+                .dropLastWhile { it.contains("TOTAL", ignoreCase = true) || it.isEmpty() }
+                .joinToString("\n")
+            
+            // Mencari semua kemungkinan harga dalam format $xx.xx
+            val pricePattern = Pattern.compile("\\$(\\d+\\.\\d{2})")
+            val matcher = pricePattern.matcher(potentialItemSection)
+            
+            var lastIndex = 0
+            var lastItemName = ""
+            
+            while (matcher.find()) {
+                try {
+                    val priceStr = matcher.group(1)
+                    val price = priceStr.toDouble()
+                    
+                    // Ambil teks di antara harga sebelumnya dan harga ini sebagai nama item
+                    val start = if (lastIndex == 0) 0 else lastIndex
+                    val end = matcher.start()
+                    
+                    if (end > start) {
+                        var itemName = potentialItemSection.substring(start, end).trim()
+                        
+                        // Bersihkan nama item dari angka di awal dan karakter khusus
+                        itemName = itemName.replace(Regex("^\\d+\\.?\\s*"), "").trim()
+                        
+                        if (itemName.isNotEmpty() && itemName != lastItemName) {
+                            items.add(mapOf(
+                                "name" to itemName,
+                                "price" to price,
+                                "quantity" to 1.0,
+                                "total" to price
+                            ))
+                            lastItemName = itemName
+                        }
+                    }
+                    
+                    lastIndex = matcher.end()
+                } catch (e: Exception) {
+                    // Skip if parsing fails
+                }
+            }
+        }
+        
         // Filter out suspicious items
-        return items.filter { 
+        val filteredItems = items.filter { 
             val name = it["name"] as String
             val price = it["price"] as Double
             val quantity = it["quantity"] as Double
@@ -323,6 +431,9 @@ class ReceiptParser @Inject constructor() {
             quantity > 0 &&
             !name.matches(Regex("(?i)total|subtotal|tax|discount|service"))  // Skip headers or summary lines
         }
+        
+        Log.d(TAG, "Extracted ${filteredItems.size} items from receipt")
+        return filteredItems
     }
     
     /**
@@ -382,7 +493,9 @@ class ReceiptParser @Inject constructor() {
             Pattern.compile("(?i)amount\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
             Pattern.compile("(?i)grand total\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
             Pattern.compile("(?i)sum\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
-            Pattern.compile("(?i)to pay\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})")
+            Pattern.compile("(?i)to pay\\s*[:=]?\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("(?i)TOTAL\\s*:\\s*(\\$?\\s*[\\d,]+\\.\\d{2})"),
+            Pattern.compile("TOTAL[^\\n]*?(\\$?\\s*[\\d,]+\\.\\d{2})")
         )
         
         // Try each pattern

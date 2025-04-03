@@ -70,8 +70,17 @@ class AdvancedImagePreprocessor @Inject constructor(
                 PreprocessingLevel.BASIC -> {
                     applyOptimizedBasicPreprocessing(processedImage)
                 }
+                PreprocessingLevel.STANDARD -> {
+                    applyOptimizedAdvancedPreprocessing(processedImage, config)
+                }
+                PreprocessingLevel.ENHANCED -> {
+                    applyOptimizedAdvancedPreprocessing(processedImage, config)
+                }
                 PreprocessingLevel.ADVANCED -> {
                     applyOptimizedAdvancedPreprocessing(processedImage, config)
+                }
+                PreprocessingLevel.INTENSIVE -> {
+                    applyOptimizedMaximumPreprocessing(processedImage, config)
                 }
                 PreprocessingLevel.MAXIMUM -> {
                     applyOptimizedMaximumPreprocessing(processedImage, config)

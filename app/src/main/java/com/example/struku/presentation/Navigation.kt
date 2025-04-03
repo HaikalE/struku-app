@@ -160,7 +160,7 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
         val viewModel = hiltViewModel<AddReceiptViewModel>()
         AddReceiptScreen(
             navController = navController,
-            receiptRepository = viewModel.repository
+            viewModel = viewModel
         )
     }
     
@@ -258,6 +258,175 @@ fun NavGraphBuilder.mainGraph(navController: NavController) {
     }
 }
 
-// The rest of the file remains unchanged
-// ...
-// AddReceiptScreen and related data classes are kept as is
+/**
+ * AddReceiptScreen implementation
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddReceiptScreen(
+    navController: NavController,
+    viewModel: AddReceiptViewModel
+) {
+    var merchantName by remember { mutableStateOf("") }
+    var dateString by remember { mutableStateOf("") }
+    var totalString by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val todayDateStr = dateFormat.format(Date())
+    
+    val categories = listOf("Makanan", "Transportasi", "Belanja", "Hiburan", "Lainnya")
+    var expanded by remember { mutableStateOf(false) }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Tambah Struk") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            OutlinedTextField(
+                value = merchantName,
+                onValueChange = { merchantName = it },
+                label = { Text("Nama Pedagang") },
+                leadingIcon = { Icon(Icons.Default.Store, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = dateString.ifEmpty { todayDateStr },
+                onValueChange = { dateString = it },
+                label = { Text("Tanggal (DD/MM/YYYY)") },
+                leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = totalString,
+                onValueChange = { totalString = it },
+                label = { Text("Total (Rp)") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Category dropdown
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = { category = it },
+                    label = { Text("Kategori") },
+                    leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+                )
+                
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.exposedDropdownSize()
+                ) {
+                    categories.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                category = option
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Button(
+                onClick = {
+                    if (merchantName.isNotBlank() && totalString.isNotBlank()) {
+                        isLoading = true
+                        
+                        val total = try {
+                            totalString.replace(".", "").replace(",", ".").toDouble()
+                        } catch (e: Exception) {
+                            0.0
+                        }
+                        
+                        val date = try {
+                            dateFormat.parse(dateString.ifEmpty { todayDateStr }) ?: Date()
+                        } catch (e: Exception) {
+                            Date()
+                        }
+                        
+                        // Create new receipt
+                        val receipt = Receipt(
+                            merchantName = merchantName,
+                            date = date,
+                            total = total,
+                            category = category,
+                            items = emptyList()
+                        )
+                        
+                        // Use IO context for DB operation
+                        CoroutineScope(Dispatchers.Main).launch {
+                            try {
+                                val id = withContext(Dispatchers.IO) {
+                                    viewModel.repository.saveReceipt(receipt)
+                                }
+                                
+                                // Navigate back
+                                navController.popBackStack()
+                            } catch (e: Exception) {
+                                Log.e("AddReceiptScreen", "Error saving receipt", e)
+                                // Show error (in a real app, add proper error handling)
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = merchantName.isNotBlank() && totalString.isNotBlank() && !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(Icons.Default.Save, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Simpan")
+                }
+            }
+        }
+    }
+}

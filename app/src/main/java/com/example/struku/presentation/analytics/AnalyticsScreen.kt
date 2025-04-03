@@ -23,6 +23,9 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -30,6 +33,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -46,9 +52,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -58,9 +65,10 @@ import com.example.struku.domain.model.Category
 import java.text.NumberFormat
 import java.util.Calendar
 import java.util.Locale
+import kotlin.math.min
 
 /**
- * Screen for displaying analytics and reports
+ * Screen for displaying analytics and reports with enhanced visualization
  */
 @Composable
 fun AnalyticsScreen(
@@ -71,6 +79,7 @@ fun AnalyticsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()
+    var selectedVisualizationType by remember { mutableStateOf(VisualizationType.OVERVIEW) }
     
     Column(
         modifier = modifier
@@ -90,8 +99,20 @@ fun AnalyticsScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
+        // Visualization type filter
+        VisualizationTypeFilter(
+            selectedType = selectedVisualizationType,
+            onTypeSelected = { selectedVisualizationType = it }
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
         // Expense overview card
-        ExpenseOverviewCard(state = state)
+        when (selectedVisualizationType) {
+            VisualizationType.OVERVIEW -> ExpenseOverviewCard(state = state)
+            VisualizationType.PIE_CHART -> ExpensePieChartCard(state = state)
+            VisualizationType.TREND -> ExpenseTrendCard(state = state)
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
@@ -122,16 +143,30 @@ fun AnalyticsScreen(
             )
         }
         
-        // Add a button to manage budgets
+        // Add buttons for managing budget and seeing trends
         Spacer(modifier = Modifier.height(32.dp))
         
-        Button(
-            onClick = { onCategoryClick("budgets") },
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(Icons.Default.MenuBook, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Kelola Anggaran Bulanan")
+            Button(
+                onClick = { onCategoryClick("budgets") },
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.MenuBook, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Kelola Anggaran")
+            }
+            
+            Button(
+                onClick = { selectedVisualizationType = VisualizationType.TREND },
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.TrendingUp, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Lihat Tren")
+            }
         }
         
         // Error message if any
@@ -154,6 +189,414 @@ fun AnalyticsScreen(
         
         // Space at the bottom for better scrolling
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+fun VisualizationTypeFilter(
+    selectedType: VisualizationType,
+    onTypeSelected: (VisualizationType) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = selectedType == VisualizationType.OVERVIEW,
+            onClick = { onTypeSelected(VisualizationType.OVERVIEW) },
+            label = { Text("Ikhtisar") },
+            leadingIcon = {
+                if (selectedType == VisualizationType.OVERVIEW) {
+                    Icon(
+                        Icons.Default.ShowChart,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        )
+        
+        FilterChip(
+            selected = selectedType == VisualizationType.PIE_CHART,
+            onClick = { onTypeSelected(VisualizationType.PIE_CHART) },
+            label = { Text("Grafik Pie") },
+            leadingIcon = {
+                if (selectedType == VisualizationType.PIE_CHART) {
+                    Icon(
+                        Icons.Default.PieChart,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        )
+        
+        FilterChip(
+            selected = selectedType == VisualizationType.TREND,
+            onClick = { onTypeSelected(VisualizationType.TREND) },
+            label = { Text("Tren") },
+            leadingIcon = {
+                if (selectedType == VisualizationType.TREND) {
+                    Icon(
+                        Icons.Default.TrendingUp,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun ExpensePieChartCard(state: AnalyticsState) {
+    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+    
+    // Calculate total expenses
+    val totalExpenses = state.expensesByCategory.values.sum()
+    
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Distribusi Pengeluaran",
+                style = MaterialTheme.typography.titleMedium
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Display pie chart only if we have expenses
+                if (totalExpenses > 0) {
+                    PieChart(
+                        data = state.expensesByCategory,
+                        availableCategories = Category.DEFAULT_CATEGORIES
+                    )
+                } else {
+                    // Show empty state
+                    Text(
+                        text = "Belum ada data pengeluaran",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Legend for the pie chart
+            Column {
+                state.expensesByCategory.entries.sortedByDescending { it.value }.forEach { (categoryId, amount) ->
+                    val category = Category.DEFAULT_CATEGORIES.find { it.id == categoryId }
+                        ?: Category("other", "Lainnya", 0xFF607D8B, "more_horiz", true)
+                    
+                    val percentage = if (totalExpenses > 0) amount / totalExpenses * 100 else 0.0
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(Color(category.color))
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Text(
+                            text = category.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Text(
+                            text = String.format("%.1f%%", percentage),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Text(
+                            text = currencyFormat.format(amount),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PieChart(
+    data: Map<String, Double>,
+    availableCategories: List<Category>,
+    modifier: Modifier = Modifier
+) {
+    val total = data.values.sum()
+    
+    Canvas(
+        modifier = modifier
+            .size(200.dp)
+            .padding(16.dp)
+    ) {
+        if (total <= 0) return@Canvas
+        
+        val radius = size.minDimension / 2
+        val center = Offset(size.width / 2, size.height / 2)
+        
+        // Draw pie slices
+        var startAngle = 0f
+        
+        data.forEach { (categoryId, value) ->
+            val category = availableCategories.find { it.id == categoryId }
+                ?: Category("other", "Lainnya", 0xFF607D8B, "more_horiz", true)
+            
+            val sweepAngle = (value / total * 360).toFloat()
+            
+            // Draw slice
+            drawArc(
+                color = Color(category.color),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = true,
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2, radius * 2)
+            )
+            
+            // Draw border around slice
+            drawArc(
+                color = Color.White,
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = true,
+                style = Stroke(width = 2f),
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2, radius * 2)
+            )
+            
+            startAngle += sweepAngle
+        }
+        
+        // Draw a hole in the center to make it a donut chart
+        drawCircle(
+            color = MaterialTheme.colorScheme.surface,
+            radius = radius * 0.6f,
+            center = center
+        )
+    }
+}
+
+@Composable
+fun ExpenseTrendCard(state: AnalyticsState) {
+    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+    
+    // Sample trend data (would be fetched from actual trends in a real implementation)
+    val previousMonthExpenses = state.expensesByCategory.values.sum() * 0.9 // Example previous month data
+    val monthBeforeExpenses = state.expensesByCategory.values.sum() * 0.85 // Example month before previous
+    
+    val currentTotal = state.expensesByCategory.values.sum()
+    
+    // Calculate trend percentage
+    val trendPercentage = if (previousMonthExpenses > 0) 
+        ((currentTotal - previousMonthExpenses) / previousMonthExpenses) * 100 
+    else 
+        0.0
+    
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Tren Pengeluaran",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Trend indicator
+                val trendColor = when {
+                    trendPercentage > 5 -> MaterialTheme.colorScheme.error
+                    trendPercentage < -5 -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.secondary
+                }
+                
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = trendColor.copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (trendPercentage >= 0) Icons.Default.TrendingUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = trendColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.width(4.dp))
+                        
+                        Text(
+                            text = String.format("%+.1f%%", trendPercentage),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = trendColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Simple bar chart
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                // Determine max value for scaling
+                val maxValue = maxOf(monthBeforeExpenses, previousMonthExpenses, currentTotal)
+                
+                // Month before previous
+                TrendBar(
+                    value = monthBeforeExpenses,
+                    maxValue = maxValue,
+                    label = getMonthName(state.month - 2),
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                
+                // Previous month
+                TrendBar(
+                    value = previousMonthExpenses,
+                    maxValue = maxValue,
+                    label = getMonthName(state.month - 1),
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                
+                // Current month
+                TrendBar(
+                    value = currentTotal,
+                    maxValue = maxValue,
+                    label = getMonthName(state.month),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            HorizontalDivider()
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Insights or suggestions based on trends
+            val message = when {
+                trendPercentage > 10 -> "Pengeluaran bulan ini meningkat signifikan. Pertimbangkan untuk mengurangi beberapa pengeluaran non-esensial."
+                trendPercentage > 5 -> "Pengeluaran bulan ini sedikit meningkat dibanding bulan lalu."
+                trendPercentage < -10 -> "Selamat! Pengeluaran bulan ini menurun drastis. Tetap jaga pola pengeluaran yang baik ini."
+                trendPercentage < -5 -> "Pengeluaran bulan ini menurun dibanding bulan lalu. Kerja bagus!"
+                else -> "Pengeluaran bulan ini relatif stabil dibanding bulan lalu."
+            }
+            
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+fun TrendBar(
+    value: Double,
+    maxValue: Double,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier.width(60.dp)
+) {
+    val heightPercentage = if (maxValue > 0) min(1f, (value / maxValue).toFloat()) else 0f
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        // Value text
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+        Text(
+            text = currencyFormat.format(value).split(",")[0], // Show only the main part of currency
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp
+        )
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        // Bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.6f)
+                .height(80.dp.times(heightPercentage))
+                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                .background(color)
+        )
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        // Month label
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 10.sp
+        )
+    }
+}
+
+private fun getMonthName(month: Int): String {
+    val adjustedMonth = ((month - 1) % 12 + 12) % 12 + 1 // Handle negative months
+    
+    return when (adjustedMonth) {
+        1 -> "Jan"
+        2 -> "Feb"
+        3 -> "Mar"
+        4 -> "Apr"
+        5 -> "Mei"
+        6 -> "Jun"
+        7 -> "Jul"
+        8 -> "Agu"
+        9 -> "Sep"
+        10 -> "Okt"
+        11 -> "Nov"
+        12 -> "Des"
+        else -> ""
     }
 }
 
@@ -275,9 +718,9 @@ fun ExpenseOverviewCard(state: AnalyticsState) {
     val overallProgress = if (totalBudget > 0) (totalExpenses / totalBudget).coerceIn(0.0, 1.0) else 0.0
     val isOverBudget = totalExpenses > totalBudget
     
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
+        colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
@@ -326,10 +769,12 @@ fun ExpenseOverviewCard(state: AnalyticsState) {
                 LinearProgressIndicator(
                     progress = overallProgress.toFloat(),
                     color = if (isOverBudget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+                    strokeCap = StrokeCap.Round,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(6.dp))
                 )
                 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -340,12 +785,34 @@ fun ExpenseOverviewCard(state: AnalyticsState) {
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isOverBudget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimaryContainer
                 )
+                
+                if (isOverBudget) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "Anda melebihi anggaran sebesar ${currencyFormat.format(totalExpenses - totalBudget)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             } else {
                 Text(
                     text = "Belum ada anggaran yang ditetapkan",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Button(
+                    onClick = { /* Handle navigation to budget settings */ },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                ) {
+                    Text("Tetapkan Anggaran")
+                }
             }
         }
     }
@@ -357,7 +824,7 @@ fun CategoryBreakdownList(
     onCategoryClick: (categoryId: String) -> Unit
 ) {
     Column {
-        state.expensesByCategory.forEach { (categoryId, amount) ->
+        state.expensesByCategory.entries.sortedByDescending { it.value }.forEach { (categoryId, amount) ->
             val category = Category.DEFAULT_CATEGORIES.find { it.id == categoryId } 
                            ?: Category("other", "Lainnya", 0xFF607D8B, "more_horiz", true)
             
@@ -438,10 +905,12 @@ fun CategoryExpenseItem(
                         LinearProgressIndicator(
                             progress = progress.toFloat(),
                             color = if (isOverBudget) MaterialTheme.colorScheme.error else categoryColor,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            strokeCap = StrokeCap.Round,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
                         )
                         
                         Spacer(modifier = Modifier.width(8.dp))
@@ -527,4 +996,10 @@ fun EmptyAnalyticsState() {
             )
         }
     }
+}
+
+enum class VisualizationType {
+    OVERVIEW,
+    PIE_CHART,
+    TREND
 }
